@@ -2,37 +2,68 @@ import { useEffect, useState } from 'react';
 import type { Project, UserRole, VisibilityType, Expense } from './types';
 import { ApiService } from './api';
 import { Navbar } from './components/Navbar';
+import { ProjectCardGrid } from './components/ProjectCardGrid';
 import { MetricsGrid } from './components/MetricsGrid';
 import { BuildingViewer } from './components/BuildingViewer';
 import { BudgetCharts } from './components/BudgetCharts';
 import { ContractorDashboard } from './components/ContractorDashboard';
 import { ClientViewer } from './components/ClientViewer';
-import { Building2, ShieldCheck } from 'lucide-react';
+import { CreateProjectModal } from './components/CreateProjectModal';
+import {
+  Building2,
+  ShieldCheck,
+  LayoutGrid,
+  CheckSquare,
+  Receipt,
+  Settings,
+  Lock,
+} from 'lucide-react';
 
 export function App() {
   const [activeRole, setActiveRole] = useState<UserRole>('contractor');
-  const [project, setProject] = useState<Project | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'viewer' | 'stages' | 'finances' | 'settings'>('viewer');
   const [loading, setLoading] = useState<boolean>(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
 
-  // Load or Seed Project
-  const loadProject = async (role: UserRole = activeRole) => {
+  // Load All Projects
+  const loadProjects = async (role: UserRole = activeRole) => {
     setLoading(true);
     try {
-      const p = await ApiService.seedDemoProject(role);
-      setProject(p);
+      const list = await ApiService.getProjects(role);
+      setProjects(list);
+      if (list.length > 0) {
+        // Keep currently selected or default to first
+        setActiveProjectId((prev) => {
+          if (prev && list.some((p) => p.id === prev)) return prev;
+          return list[0].id;
+        });
+      }
     } catch (err) {
-      console.error('Failed to load project:', err);
-    } finally {
+      console.error('Failed to load projects:', err);
+    } fontally: {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadProject(activeRole);
+    loadProjects(activeRole);
   }, [activeRole]);
+
+  const activeProject = projects.find((p) => p.id === activeProjectId) || projects[0] || null;
+
+  const updateActiveProjectInState = (updated: Project) => {
+    setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+  };
 
   const handleRoleChange = (newRole: UserRole) => {
     setActiveRole(newRole);
+  };
+
+  const handleSelectProject = (project: Project) => {
+    setActiveProjectId(project.id);
+    setActiveTab('viewer');
   };
 
   const handleCreateNewProject = async (data: {
@@ -51,12 +82,16 @@ export function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+      let newProj: Project;
+
       if (res.ok) {
-        const newProj = await res.json();
-        setProject(newProj);
+        newProj = await res.json();
       } else {
-        throw new Error('Create project API failed');
+        throw new Error('Backend create failed, fallback to local');
       }
+      setProjects((prev) => [newProj, ...prev]);
+      setActiveProjectId(newProj.id);
+      setActiveTab('viewer');
     } catch (err) {
       console.warn('Backend unavailable, constructing new project locally', err);
       // Create local project structure
@@ -64,7 +99,7 @@ export function App() {
         const floorNum = data.floor_count - fIdx;
         const floorId = `floor-${floorNum}-${Date.now()}`;
         const units = Array.from({ length: data.units_per_floor }, (_, uIdx) => {
-          const unitNum = (floorNum * 100) + (uIdx + 1);
+          const unitNum = floorNum * 100 + (uIdx + 1);
           const unitId = `unit-${unitNum}-${Date.now()}`;
           return {
             id: unitId,
@@ -119,6 +154,9 @@ export function App() {
         contractor_id: 'c-demo-1',
         name: data.name,
         location: data.location || 'Türkiye',
+        description: `${data.floor_count} Katlı Yeni Başlanan İnşaat Projesi`,
+        status: 'planning',
+        unit_count: data.floor_count * data.units_per_floor,
         total_budget: data.total_budget,
         visibility: data.visibility,
         show_financials_to_clients: data.show_financials_to_clients,
@@ -154,7 +192,9 @@ export function App() {
         ],
       };
 
-      setProject(localNewProject);
+      setProjects((prev) => [localNewProject, ...prev]);
+      setActiveProjectId(localNewProject.id);
+      setActiveTab('viewer');
     } finally {
       setLoading(false);
     }
@@ -164,39 +204,40 @@ export function App() {
     visibility: VisibilityType,
     showFinancials: boolean
   ) => {
-    if (!project) return;
+    if (!activeProject) return;
     const updated = await ApiService.updateVisibility(
-      project.id,
+      activeProject.id,
       visibility,
       showFinancials,
       activeRole
     );
-    setProject(updated);
+    updateActiveProjectInState(updated);
   };
 
   const handleAddExpense = async (expenseData: Partial<Expense>) => {
-    if (!project) return;
-    const newExp = await ApiService.createExpense(project.id, expenseData);
+    if (!activeProject) return;
+    const newExp = await ApiService.createExpense(activeProject.id, expenseData);
 
-    const updatedExpenses = [newExp, ...(project.expenses || [])];
+    const updatedExpenses = [newExp, ...(activeProject.expenses || [])];
     const totalActual = updatedExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const variance = project.total_budget - totalActual;
-    const finProg = project.total_budget > 0 ? (totalActual / project.total_budget) * 100 : 0;
+    const variance = activeProject.total_budget - totalActual;
+    const finProg = activeProject.total_budget > 0 ? (totalActual / activeProject.total_budget) * 100 : 0;
 
-    setProject({
-      ...project,
+    const updatedProj: Project = {
+      ...activeProject,
       expenses: updatedExpenses,
       total_actual_cost: totalActual,
       cost_variance: variance,
       financial_progress: Math.round(finProg * 10) / 10,
-    });
+    };
+    updateActiveProjectInState(updatedProj);
   };
 
   const handleToggleFloorStage = async (floorId: string, stageId: string, isCompleted: boolean) => {
-    if (!project || !project.floors) return;
+    if (!activeProject || !activeProject.floors) return;
     await ApiService.updateStage(stageId, isCompleted);
 
-    const newFloors = project.floors.map((f) => {
+    const newFloors = activeProject.floors.map((f) => {
       if (f.id === floorId && f.stages) {
         const updatedStages = f.stages.map((st) =>
           st.id === stageId ? { ...st, is_completed: isCompleted } : st
@@ -207,14 +248,14 @@ export function App() {
       return f;
     });
 
-    recalculateAndSetProject(newFloors, project.stages || []);
+    recalculateAndSetProject(newFloors, activeProject.stages || []);
   };
 
   const handleToggleUnitStage = async (unitId: string, stageId: string, isCompleted: boolean) => {
-    if (!project || !project.floors) return;
+    if (!activeProject || !activeProject.floors) return;
     await ApiService.updateStage(stageId, isCompleted);
 
-    const newFloors = project.floors.map((f) => {
+    const newFloors = activeProject.floors.map((f) => {
       if (!f.units) return f;
       const updatedUnits = f.units.map((u) => {
         if (u.id === unitId && u.stages) {
@@ -229,22 +270,22 @@ export function App() {
       return { ...f, units: updatedUnits };
     });
 
-    recalculateAndSetProject(newFloors, project.stages || []);
+    recalculateAndSetProject(newFloors, activeProject.stages || []);
   };
 
   const handleToggleProjectStage = async (stageId: string, isCompleted: boolean) => {
-    if (!project || !project.stages) return;
+    if (!activeProject || !activeProject.stages) return;
     await ApiService.updateStage(stageId, isCompleted);
 
-    const newProjectStages = project.stages.map((st) =>
+    const newProjectStages = activeProject.stages.map((st) =>
       st.id === stageId ? { ...st, is_completed: isCompleted } : st
     );
 
-    recalculateAndSetProject(project.floors || [], newProjectStages);
+    recalculateAndSetProject(activeProject.floors || [], newProjectStages);
   };
 
   const recalculateAndSetProject = (floors: any[], projectStages: any[]) => {
-    if (!project) return;
+    if (!activeProject) return;
     let totalWeight = 0;
     let completedWeight = 0;
 
@@ -268,105 +309,239 @@ export function App() {
 
     const newPhysProgress = totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 1000) / 10 : 0;
 
-    setProject({
-      ...project,
+    const updatedProj: Project = {
+      ...activeProject,
       floors,
       stages: projectStages,
       physical_progress: newPhysProgress,
-    });
+    };
+    updateActiveProjectInState(updatedProj);
   };
 
-  const isClientHidden = activeRole === 'client' && (!project || !project.show_financials_to_clients);
+  const isClientHidden =
+    activeRole === 'client' && (!activeProject || !activeProject.show_financials_to_clients);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Navbar */}
-      <Navbar
-        activeRole={activeRole}
-        onRoleChange={handleRoleChange}
-        project={project}
-        onSeedDemo={() => loadProject(activeRole)}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreateProject={handleCreateNewProject}
       />
 
-      {/* Main Body Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Top Main Navbar */}
+      <Navbar
+        projects={projects}
+        activeProject={activeProject}
+        onSelectProject={handleSelectProject}
+        activeRole={activeRole}
+        onRoleChange={handleRoleChange}
+        onOpenPortfolio={() => setActiveTab('portfolio')}
+        onOpenCreateModal={() => setIsCreateModalOpen(true)}
+        onSeedDemo={() => loadProjects(activeRole)}
+      />
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center animate-spin mb-4">
-              <Building2 className="w-6 h-6" />
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center animate-spin mb-4 shadow-lg shadow-amber-500/20">
+              <Building2 className="w-7 h-7" />
             </div>
-            <h2 className="text-lg font-bold text-white">İnşaat Verileri Yükleniyor...</h2>
-            <p className="text-xs text-slate-400 mt-1">Gölgeden Yapıya görselleştirici hazırlanıyor</p>
+            <h2 className="text-xl font-bold text-white">İnşaat Verileri Yükleniyor...</h2>
+            <p className="text-xs text-slate-400 mt-1">Gölgeden Yapıya çoklu proje servisi senkronize ediliyor</p>
           </div>
-        ) : project ? (
+        ) : (
           <>
-            {/* 1. Executive Role Banner */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl px-6 py-3.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div className="flex items-center gap-3">
-                <span className="w-3 h-3 rounded-full bg-amber-400 animate-ping" />
-                <span className="text-xs font-semibold text-slate-300">
-                  Aktif Görünüm Modu:{' '}
-                  <strong className="text-amber-400 capitalize">
-                    {activeRole === 'contractor' ? 'Müteahhit / Yönetici (Admin Ekranı)' : 'Müşteri / Yatırımcı (İzleme Portalı)'}
-                  </strong>
-                </span>
+            {/* Top Sub-Navigation Tabs Bar */}
+            <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 p-2 rounded-3xl flex items-center justify-between overflow-x-auto gap-2 shadow-2xl">
+              <div className="flex items-center gap-1.5 min-w-max">
+                <button
+                  onClick={() => setActiveTab('portfolio')}
+                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    activeTab === 'portfolio'
+                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  <span>Portföy (Tüm İnşaatlar)</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('viewer')}
+                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    activeTab === 'viewer'
+                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Building2 className="w-4 h-4" />
+                  <span>Bina Görselleştirici</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('stages')}
+                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    activeTab === 'stages'
+                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <CheckSquare className="w-4 h-4" />
+                  <span>{activeRole === 'contractor' ? 'Aşama & İmalat Yönetimi' : 'Daire Takibi & Saha'}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('finances')}
+                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    activeTab === 'finances'
+                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Receipt className="w-4 h-4" />
+                  <span>Finans & Gider Analizi</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    activeTab === 'settings'
+                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Gizlilik & Ayarlar</span>
+                </button>
               </div>
 
-              {activeRole === 'client' && (
-                <span className="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-full border border-slate-700 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                  {project.show_financials_to_clients
-                    ? 'Finansal Veriler Görünür'
-                    : 'Finansal Veriler Gizli (Maskeli)'}
+              {/* Active Role Indicator Badge */}
+              <div className="hidden lg:flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-2xl text-xs">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span className="text-slate-400 font-semibold">
+                  {activeRole === 'contractor' ? 'Müteahhit Modu' : 'Müşteri Modu'}
                 </span>
-              )}
+              </div>
             </div>
 
-            {/* 2. Top KPI Metrics Grid */}
-            <MetricsGrid project={project} isClientHidden={isClientHidden} activeRole={activeRole} />
+            {/* TAB CONTENT RENDERING */}
 
-            {/* 3. Main Feature: Architectural House & Building Blueprint Viewer */}
-            <BuildingViewer
-              floors={project.floors || []}
-              onToggleFloorStage={handleToggleFloorStage}
-              onToggleUnitStage={handleToggleUnitStage}
-              isContractor={activeRole === 'contractor'}
-            />
-
-            {/* 4. Distinct Role-Specific Dashboards */}
-            {activeRole === 'contractor' ? (
-              <ContractorDashboard
-                project={project}
-                onUpdateVisibility={handleUpdateVisibility}
-                onAddExpense={handleAddExpense}
-                onToggleStage={handleToggleProjectStage}
-                onCreateNewProject={handleCreateNewProject}
+            {/* Tab 1: All Projects Portfolio Gallery */}
+            {activeTab === 'portfolio' && (
+              <ProjectCardGrid
+                projects={projects}
+                activeProjectId={activeProjectId}
+                onSelectProject={handleSelectProject}
+                onOpenCreateModal={() => setIsCreateModalOpen(true)}
+                activeRole={activeRole}
               />
-            ) : (
-              <ClientViewer project={project} isClientHidden={isClientHidden} />
             )}
 
-            {/* 5. Financial Charts (Recharts - Müteahhit veya İzin Verilen Müşteri Görünümü) */}
-            {!isClientHidden && (
-              <BudgetCharts project={project} isClientHidden={isClientHidden} />
+            {/* Tab 2: Selected Project Building Viewer & Architectural Blueprint */}
+            {activeTab === 'viewer' && activeProject && (
+              <div className="space-y-6">
+                <MetricsGrid project={activeProject} isClientHidden={isClientHidden} activeRole={activeRole} />
+                <BuildingViewer
+                  floors={activeProject.floors || []}
+                  onToggleFloorStage={handleToggleFloorStage}
+                  onToggleUnitStage={handleToggleUnitStage}
+                  isContractor={activeRole === 'contractor'}
+                />
+              </div>
+            )}
+
+            {/* Tab 3: Stages, Checklists & Site Updates */}
+            {activeTab === 'stages' && activeProject && (
+              activeRole === 'contractor' ? (
+                <ContractorDashboard
+                  project={activeProject}
+                  onUpdateVisibility={handleUpdateVisibility}
+                  onAddExpense={handleAddExpense}
+                  onToggleStage={handleToggleProjectStage}
+                  onCreateNewProject={handleCreateNewProject}
+                  initialTab="stages"
+                />
+              ) : (
+                <ClientViewer project={activeProject} isClientHidden={isClientHidden} />
+              )
+            )}
+
+            {/* Tab 4: Financial Charts & Expenses Logger */}
+            {activeTab === 'finances' && activeProject && (
+              <div className="space-y-6">
+                {isClientHidden ? (
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 text-center max-w-xl mx-auto space-y-4 shadow-2xl">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
+                      <Lock className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white">Finansal Veriler Gizli</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Bu projenin harcama ve bütçe ayrıntıları müteahhit tarafından müşteri gizlilik ayarlarına uygun olarak maskelenmiştir.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {activeRole === 'contractor' && (
+                      <ContractorDashboard
+                        project={activeProject}
+                        onUpdateVisibility={handleUpdateVisibility}
+                        onAddExpense={handleAddExpense}
+                        onToggleStage={handleToggleProjectStage}
+                        onCreateNewProject={handleCreateNewProject}
+                        initialTab="expenses"
+                      />
+                    )}
+                    <BudgetCharts project={activeProject} isClientHidden={isClientHidden} />
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Tab 5: Privacy & Visibility Settings */}
+            {activeTab === 'settings' && activeProject && (
+              <div className="space-y-6">
+                {activeRole === 'contractor' ? (
+                  <ContractorDashboard
+                    project={activeProject}
+                    onUpdateVisibility={handleUpdateVisibility}
+                    onAddExpense={handleAddExpense}
+                    onToggleStage={handleToggleProjectStage}
+                    onCreateNewProject={handleCreateNewProject}
+                    initialTab="settings"
+                  />
+                ) : (
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 text-center max-w-xl mx-auto space-y-4 shadow-2xl">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
+                      <ShieldCheck className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white">Müşteri Gizlilik & Erişim Politikası</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Müşteri modundasınız. Proje izinleriniz şeffaf izleme yetkisiyle tanımlanmıştır. Projenin genel görünürlüğü:{' '}
+                      <strong className="text-amber-400 uppercase">{activeProject.visibility}</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
           </>
-        ) : (
-          <div className="text-center py-20 text-rose-400">Proje verisi yüklenemedi.</div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-500 mt-12">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-amber-500" />
             <span className="font-bold text-slate-400">Gölgeden Yapıya Platformu</span>
           </div>
-          <span>Go Clean Architecture Backend & React TypeScript Entegre SaaS</span>
+          <span>Çoklu İnşaat & Canlı Doku Takip Sistemi • React TypeScript</span>
         </div>
       </footer>
     </div>
   );
 }
+
 export default App;

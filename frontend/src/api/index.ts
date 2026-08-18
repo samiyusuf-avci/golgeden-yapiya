@@ -19,6 +19,21 @@ export class ApiService {
     return headers;
   }
 
+  static async getProjects(activeRole: UserRole = 'contractor'): Promise<Project[]> {
+    try {
+      const res = await fetch(`${API_BASE}/projects`, {
+        headers: this.getHeaders(activeRole),
+      });
+      if (!res.ok) throw new Error('Backend fetch projects failed');
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+      return this.getAllMockProjects(activeRole);
+    } catch (err) {
+      console.warn('Backend unavailable, using local mock projects list', err);
+      return this.getAllMockProjects(activeRole);
+    }
+  }
+
   static async seedDemoProject(activeRole: UserRole = 'contractor'): Promise<Project> {
     try {
       const res = await fetch(`${API_BASE}/projects/demo-project-zumrut-kule/seed`, {
@@ -41,8 +56,10 @@ export class ApiService {
       if (!res.ok) throw new Error('Fetch project failed');
       return await res.json();
     } catch (err) {
-      console.warn('Backend getProject failed, using local project', err);
-      return this.getLocalMockProject(activeRole);
+      console.warn('Backend getProject failed, searching local mock projects', err);
+      const all = this.getAllMockProjects(activeRole);
+      const found = all.find((p) => p.id === id);
+      return found || all[0];
     }
   }
 
@@ -61,8 +78,8 @@ export class ApiService {
       if (!res.ok) throw new Error('Update visibility failed');
       return await res.json();
     } catch (err) {
-      console.warn('Backend update failed, using local update', err);
-      const proj = this.getLocalMockProject(activeRole);
+      console.warn('Backend update failed, updating local mock project', err);
+      const proj = await this.getProject(projectID, activeRole);
       proj.visibility = visibility;
       proj.show_financials_to_clients = showFinancialsToClients;
       return proj;
@@ -111,9 +128,18 @@ export class ApiService {
     }
   }
 
-  // Local fallback mock project for seamless offline demonstration
+  // Multi-project Mock Database
+  static getAllMockProjects(activeRole: UserRole): Project[] {
+    return [
+      this.getLocalMockProject(activeRole),
+      this.getSafirVillalariMockProject(activeRole),
+      this.getKehribarKonaklariMockProject(activeRole),
+    ];
+  }
+
+  // 1. Zümrüt Kule Rezidans
   static getLocalMockProject(activeRole: UserRole): Project {
-    const showFinancials = true; // contractor or default
+    const showFinancials = true;
     const isClientHidden = activeRole === 'client' && !showFinancials;
 
     return {
@@ -121,9 +147,12 @@ export class ApiService {
       contractor_id: 'c-demo-1',
       name: 'Zümrüt Kule Rezidans',
       location: 'Pendik / İstanbul',
+      description: '5 Katlı 10 Daireli Lüks Konut & Şehir Manzaralı Rezidans Projesi',
+      status: 'active',
+      unit_count: 10,
       total_budget: isClientHidden ? 0 : 15000000,
       visibility: 'public',
-      show_financials_to_clients: false,
+      show_financials_to_clients: true,
       physical_progress: 58.5,
       financial_progress: isClientHidden ? 0 : 37.1,
       total_actual_cost: isClientHidden ? 0 : 5570000,
@@ -133,7 +162,7 @@ export class ApiService {
           id: 's-1',
           project_id: 'demo-project-zumrut-kule',
           name: 'Hafriyat ve Temel Kazısı',
-          category: 'material',
+          category: 'official',
           estimated_cost: isClientHidden ? 0 : 1500000,
           actual_cost: isClientHidden ? 0 : 1420000,
           weight_percentage: 15,
@@ -287,6 +316,206 @@ export class ApiService {
             { id: 'exp-3', project_id: 'demo-project-zumrut-kule', category: 'labor', amount: 850000, notes: 'Kalıp ve Taşeron İşçilik Ödemesi', invoice_url: 'https://example.com/invoice-003.pdf', date: '2026-07-20' },
             { id: 'exp-4', project_id: 'demo-project-zumrut-kule', category: 'official', amount: 320000, notes: 'Belediye Yapı Denetim Harçları', invoice_url: 'https://example.com/invoice-004.pdf', date: '2026-08-05' },
             { id: 'exp-5', project_id: 'demo-project-zumrut-kule', category: 'subcontractor', amount: 1000000, notes: 'Elektrik & Sıhhi Tesisat Avansı', invoice_url: 'https://example.com/invoice-005.pdf', date: '2026-08-12' },
+          ],
+    };
+  }
+
+  // 2. Safir Villaları Projesi
+  static getSafirVillalariMockProject(activeRole: UserRole): Project {
+    const showFinancials = false; // protected financials demo
+    const isClientHidden = activeRole === 'client' && !showFinancials;
+
+    return {
+      id: 'demo-project-safir-villalari',
+      contractor_id: 'c-demo-1',
+      name: 'Safir Villaları Projesi',
+      location: 'Şile / İstanbul',
+      description: '3 Katlı Müstakil 6 Adet Akıllı Lüks Villa ve Peyzaj Yerleşkesi',
+      status: 'active',
+      unit_count: 6,
+      total_budget: isClientHidden ? 0 : 28000000,
+      visibility: 'protected',
+      show_financials_to_clients: false,
+      physical_progress: 82.0,
+      financial_progress: isClientHidden ? 0 : 75.4,
+      total_actual_cost: isClientHidden ? 0 : 21112000,
+      cost_variance: isClientHidden ? 0 : 6888000,
+      stages: [
+        {
+          id: 'safir-s-1',
+          project_id: 'demo-project-safir-villalari',
+          name: 'Peyzaj Kazı & Havuz Altyapısı',
+          category: 'official',
+          estimated_cost: isClientHidden ? 0 : 4000000,
+          actual_cost: isClientHidden ? 0 : 3950000,
+          weight_percentage: 25,
+          is_completed: true,
+          order_index: 1,
+        },
+        {
+          id: 'safir-s-2',
+          project_id: 'demo-project-safir-villalari',
+          name: 'Ahşap & Çelik Karkas İmalatı',
+          category: 'material',
+          estimated_cost: isClientHidden ? 0 : 12000000,
+          actual_cost: isClientHidden ? 0 : 11800000,
+          weight_percentage: 45,
+          is_completed: true,
+          order_index: 2,
+        },
+      ],
+      floors: [
+        {
+          id: 'safir-f-3',
+          project_id: 'demo-project-safir-villalari',
+          floor_number: 3,
+          name: 'Çatı & Teras Katı',
+          is_completed: true,
+          stages: [
+            {
+              id: 'st-safir-f-3',
+              project_id: 'demo-project-safir-villalari',
+              floor_id: 'safir-f-3',
+              name: 'Güneş Paneli & Çatı İzolasyon',
+              category: 'subcontractor',
+              estimated_cost: isClientHidden ? 0 : 3000000,
+              actual_cost: isClientHidden ? 0 : 2900000,
+              weight_percentage: 10,
+              is_completed: true,
+              order_index: 1,
+            },
+          ],
+          units: [
+            { id: 'safir-u-301', floor_id: 'safir-f-3', unit_number: 301, name: 'Villa Safir-A Teras Suite', is_completed: true },
+            { id: 'safir-u-302', floor_id: 'safir-f-3', unit_number: 302, name: 'Villa Safir-B Teras Suite', is_completed: true },
+          ],
+        },
+        {
+          id: 'safir-f-2',
+          project_id: 'demo-project-safir-villalari',
+          floor_number: 2,
+          name: 'Üst Kat (Yatak Odaları)',
+          is_completed: true,
+          units: [
+            { id: 'safir-u-201', floor_id: 'safir-f-2', unit_number: 201, name: 'Villa Safir-A Üst Kat', is_completed: true },
+            { id: 'safir-u-202', floor_id: 'safir-f-2', unit_number: 202, name: 'Villa Safir-B Üst Kat', is_completed: true },
+          ],
+        },
+        {
+          id: 'safir-f-1',
+          project_id: 'demo-project-safir-villalari',
+          floor_number: 1,
+          name: 'Bahçe Katı & Salon',
+          is_completed: true,
+          units: [
+            { id: 'safir-u-101', floor_id: 'safir-f-1', unit_number: 101, name: 'Villa Safir-A Bahçe Katı', is_completed: true },
+            { id: 'safir-u-102', floor_id: 'safir-f-1', unit_number: 102, name: 'Villa Safir-B Bahçe Katı', is_completed: true },
+          ],
+        },
+      ],
+      expenses: isClientHidden
+        ? []
+        : [
+            { id: 'exp-safir-1', project_id: 'demo-project-safir-villalari', category: 'material', amount: 11800000, notes: 'Özel Ahşap ve Çelik Konstrüksiyon', invoice_url: 'https://example.com/invoice-safir-01.pdf', date: '2026-05-10' },
+            { id: 'exp-safir-2', project_id: 'demo-project-safir-villalari', category: 'subcontractor', amount: 9312000, notes: 'Akıllı Ev Altyapısı & Havuz Tesisatı', invoice_url: 'https://example.com/invoice-safir-02.pdf', date: '2026-07-15' },
+          ],
+    };
+  }
+
+  // 3. Kehribar Konakları & İş Merkezi
+  static getKehribarKonaklariMockProject(activeRole: UserRole): Project {
+    const showFinancials = true;
+    const isClientHidden = activeRole === 'client' && !showFinancials;
+
+    return {
+      id: 'demo-project-kehribar-konaklari',
+      contractor_id: 'c-demo-1',
+      name: 'Kehribar Konakları & İş Merkezi',
+      location: 'Kadıköy / İstanbul',
+      description: '4 Katlı Karma Kullanımlı Ofis, Çarşı ve Ticari İş Merkezi',
+      status: 'planning',
+      unit_count: 8,
+      total_budget: isClientHidden ? 0 : 42000000,
+      visibility: 'public',
+      show_financials_to_clients: true,
+      physical_progress: 24.0,
+      financial_progress: isClientHidden ? 0 : 18.5,
+      total_actual_cost: isClientHidden ? 0 : 7770000,
+      cost_variance: isClientHidden ? 0 : 34230000,
+      stages: [
+        {
+          id: 'keh-s-1',
+          project_id: 'demo-project-kehribar-konaklari',
+          name: 'Zemin İkza ve İksa Kazık İşleri',
+          category: 'official',
+          estimated_cost: isClientHidden ? 0 : 8000000,
+          actual_cost: isClientHidden ? 0 : 7770000,
+          weight_percentage: 20,
+          is_completed: true,
+          order_index: 1,
+        },
+        {
+          id: 'keh-s-2',
+          project_id: 'demo-project-kehribar-konaklari',
+          name: 'Bodrum Kat Şerbetli Beton',
+          category: 'material',
+          estimated_cost: isClientHidden ? 0 : 10000000,
+          actual_cost: 0,
+          weight_percentage: 25,
+          is_completed: false,
+          order_index: 2,
+        },
+      ],
+      floors: [
+        {
+          id: 'keh-f-4',
+          project_id: 'demo-project-kehribar-konaklari',
+          floor_number: 4,
+          name: '4. Kat Executive Ofisler',
+          is_completed: false,
+          units: [
+            { id: 'keh-u-401', floor_id: 'keh-f-4', unit_number: 401, name: 'Ofis 401 (Plaza)', is_completed: false },
+            { id: 'keh-u-402', floor_id: 'keh-f-4', unit_number: 402, name: 'Ofis 402 (Plaza)', is_completed: false },
+          ],
+        },
+        {
+          id: 'keh-f-3',
+          project_id: 'demo-project-kehribar-konaklari',
+          floor_number: 3,
+          name: '3. Kat Plaza Ofisleri',
+          is_completed: false,
+          units: [
+            { id: 'keh-u-301', floor_id: 'keh-f-3', unit_number: 301, name: 'Ofis 301', is_completed: false },
+            { id: 'keh-u-302', floor_id: 'keh-f-3', unit_number: 302, name: 'Ofis 302', is_completed: false },
+          ],
+        },
+        {
+          id: 'keh-f-2',
+          project_id: 'demo-project-kehribar-konaklari',
+          floor_number: 2,
+          name: '2. Kat Ticari Mağazalar',
+          is_completed: false,
+          units: [
+            { id: 'keh-u-201', floor_id: 'keh-f-2', unit_number: 201, name: 'Dükkan 201', is_completed: false },
+            { id: 'keh-u-202', floor_id: 'keh-f-2', unit_number: 202, name: 'Dükkan 202', is_completed: false },
+          ],
+        },
+        {
+          id: 'keh-f-1',
+          project_id: 'demo-project-kehribar-konaklari',
+          floor_number: 1,
+          name: 'Zemin Kat Çarşı & Cadde Dükkanları',
+          is_completed: false,
+          units: [
+            { id: 'keh-u-101', floor_id: 'keh-f-1', unit_number: 101, name: 'Cadde Mağaza 101', is_completed: false },
+            { id: 'keh-u-102', floor_id: 'keh-f-1', unit_number: 102, name: 'Cadde Mağaza 102', is_completed: false },
+          ],
+        },
+      ],
+      expenses: isClientHidden
+        ? []
+        : [
+            { id: 'exp-keh-1', project_id: 'demo-project-kehribar-konaklari', category: 'official', amount: 7770000, notes: 'Kadıköy Belediye Proje Ruhsatı & İksa Harcı', invoice_url: 'https://example.com/invoice-keh-01.pdf', date: '2026-08-01' },
           ],
     };
   }

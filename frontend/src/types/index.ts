@@ -65,6 +65,9 @@ export interface Project {
   visibility: VisibilityType;
   show_financials_to_clients: boolean;
   created_at?: string;
+  description?: string;
+  status?: 'active' | 'planning' | 'completed';
+  unit_count?: number;
   
   // Derived metrics
   physical_progress: number;

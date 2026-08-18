@@ -23,6 +23,7 @@ interface ContractorDashboardProps {
   onAddExpense: (expense: Partial<Expense>) => void;
   onToggleStage: (stageId: string, isCompleted: boolean) => void;
   onCreateNewProject: (projectData: any) => void;
+  initialTab?: 'expenses' | 'settings' | 'stages';
 }
 
 export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
@@ -31,8 +32,9 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
   onAddExpense,
   onToggleStage,
   onCreateNewProject,
+  initialTab = 'expenses',
 }) => {
-  const [activeTab, setActiveTab] = useState<'expenses' | 'settings' | 'stages'>('expenses');
+  const [activeTab, setActiveTab] = useState<'expenses' | 'settings' | 'stages'>(initialTab);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // New Expense Form State
