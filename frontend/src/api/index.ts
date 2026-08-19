@@ -1,4 +1,4 @@
-import type { Project, Expense, UserRole, VisibilityType } from '../types';
+import type { Project, Expense, UserRole, VisibilityType, UserProfile } from '../types';
 
 const API_BASE = 'http://localhost:8080/api/v1';
 
@@ -7,7 +7,7 @@ export class ApiService {
     return localStorage.getItem('golgeden_token');
   }
 
-  private static getHeaders(activeRole: UserRole): Record<string, string> {
+  private static getHeaders(activeRole: UserRole = 'contractor'): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Demo-Role': activeRole,
@@ -19,19 +19,84 @@ export class ApiService {
     return headers;
   }
 
+  static getUserProfile(): UserProfile {
+    return {
+      id: 'usr-demo-001',
+      name: 'Sami Yusuf Avcı',
+      title: 'Kıdemli İnşaat Mühendisi & Proje Yöneticisi',
+      company: 'Avcı Yapı & Gayrimenkul A.Ş.',
+      email: 'sami.avci@golgedenyapiya.com',
+      phone: '+90 (532) 555 01 99',
+      location: 'İstanbul, Türkiye',
+      avatar_url: '',
+      bio: 'SaaS mimarisi, lüks rezidans projeleri, betonarme statik ve şeffaf şantiye yönetim uzmanı.',
+      stats: {
+        total_managed_projects: 3,
+        total_following_projects: 2,
+        total_budget_managed: 73000000,
+        total_units_completed: 28,
+      },
+      settings: {
+        email_notifications: true,
+        site_updates_push: true,
+        dark_mode: true,
+        public_profile: true,
+      },
+    };
+  }
+
+  static getStoredProjects(): Project[] | null {
+    try {
+      const data = localStorage.getItem('golgeden_projects');
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse stored projects:', e);
+    }
+    return null;
+  }
+
+  static saveProjectsToStorage(projects: Project[]): void {
+    try {
+      localStorage.setItem('golgeden_projects', JSON.stringify(projects));
+    } catch (e) {
+      console.warn('Failed to save projects to storage:', e);
+    }
+  }
+
   static async getProjects(activeRole: UserRole = 'contractor'): Promise<Project[]> {
+    const stored = this.getStoredProjects();
+
     try {
       const res = await fetch(`${API_BASE}/projects`, {
         headers: this.getHeaders(activeRole),
       });
-      if (!res.ok) throw new Error('Backend fetch projects failed');
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) return data;
-      return this.getAllMockProjects(activeRole);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          // If user previously deleted projects locally, respect local storage deletions
+          if (stored !== null) {
+            return stored;
+          }
+          this.saveProjectsToStorage(data);
+          return data;
+        }
+      }
     } catch (err) {
-      console.warn('Backend unavailable, using local mock projects list', err);
-      return this.getAllMockProjects(activeRole);
+      console.warn('Backend unavailable, using local persistent storage', err);
     }
+
+    if (stored !== null) {
+      return stored;
+    }
+
+    const initialMocks = this.getAllMockProjects(activeRole);
+    this.saveProjectsToStorage(initialMocks);
+    return initialMocks;
   }
 
   static async seedDemoProject(activeRole: UserRole = 'contractor'): Promise<Project> {
@@ -69,6 +134,16 @@ export class ApiService {
     showFinancialsToClients: boolean,
     activeRole: UserRole
   ): Promise<Project> {
+    const updateLocalStored = (pID: string, vis: VisibilityType, showFin: boolean) => {
+      const stored = this.getStoredProjects();
+      if (stored) {
+        const updated = stored.map((p) =>
+          p.id === pID ? { ...p, visibility: vis, show_financials_to_clients: showFin } : p
+        );
+        this.saveProjectsToStorage(updated);
+      }
+    };
+
     try {
       const res = await fetch(`${API_BASE}/projects/${projectID}/visibility`, {
         method: 'PATCH',
@@ -76,13 +151,33 @@ export class ApiService {
         body: JSON.stringify({ visibility, show_financials_to_clients: showFinancialsToClients }),
       });
       if (!res.ok) throw new Error('Update visibility failed');
-      return await res.json();
+      const data = await res.json();
+      updateLocalStored(projectID, visibility, showFinancialsToClients);
+      return data;
     } catch (err) {
       console.warn('Backend update failed, updating local mock project', err);
       const proj = await this.getProject(projectID, activeRole);
       proj.visibility = visibility;
       proj.show_financials_to_clients = showFinancialsToClients;
+      updateLocalStored(projectID, visibility, showFinancialsToClients);
       return proj;
+    }
+  }
+
+  static async deleteProject(projectID: string): Promise<void> {
+    try {
+      await fetch(`${API_BASE}/projects/${projectID}`, {
+        method: 'DELETE',
+        headers: this.getHeaders('contractor'),
+      });
+    } catch (err) {
+      console.warn('Backend delete project failed', err);
+    }
+
+    const stored = this.getStoredProjects();
+    if (stored) {
+      const updated = stored.filter((p) => p.id !== projectID);
+      this.saveProjectsToStorage(updated);
     }
   }
 
@@ -134,6 +229,7 @@ export class ApiService {
       this.getLocalMockProject(activeRole),
       this.getSafirVillalariMockProject(activeRole),
       this.getKehribarKonaklariMockProject(activeRole),
+      this.getYakutKonutlariMockProject(),
     ];
   }
 
@@ -517,6 +613,55 @@ export class ApiService {
         : [
             { id: 'exp-keh-1', project_id: 'demo-project-kehribar-konaklari', category: 'official', amount: 7770000, notes: 'Kadıköy Belediye Proje Ruhsatı & İksa Harcı', invoice_url: 'https://example.com/invoice-keh-01.pdf', date: '2026-08-01' },
           ],
+    };
+  }
+
+  // 4. Yakut Konutları & Park Evleri (Biten Proje)
+  static getYakutKonutlariMockProject(): Project {
+    return {
+      id: 'demo-project-yakut-konutlari',
+      contractor_id: 'c-demo-1',
+      name: 'Yakut Konutları & Park Evleri',
+      location: 'Ataşehir / İstanbul',
+      description: '4 Katlı 12 Daireli Tamamlanmış & İskanı Alınmış Lüks Rezidans Projesi',
+      status: 'completed',
+      unit_count: 12,
+      total_budget: 18000000,
+      visibility: 'public',
+      show_financials_to_clients: true,
+      physical_progress: 100.0,
+      financial_progress: 100.0,
+      total_actual_cost: 17850000,
+      cost_variance: 150000,
+      contractor_name: 'Avcı Yapı A.Ş.',
+      stages: [
+        {
+          id: 'yak-s-1',
+          project_id: 'demo-project-yakut-konutlari',
+          name: 'İskan ve Anahtar Teslimi',
+          category: 'official',
+          estimated_cost: 18000000,
+          actual_cost: 17850000,
+          weight_percentage: 100,
+          is_completed: true,
+          order_index: 1,
+        },
+      ],
+      floors: [
+        {
+          id: 'yak-f-1',
+          project_id: 'demo-project-yakut-konutlari',
+          floor_number: 1,
+          name: '1. Kat (Tamamlandı)',
+          is_completed: true,
+          units: [
+            { id: 'yak-u-101', floor_id: 'yak-f-1', unit_number: 101, name: 'Daire 101 (Teslim Edildi)', is_completed: true },
+          ],
+        },
+      ],
+      expenses: [
+        { id: 'exp-yak-1', project_id: 'demo-project-yakut-konutlari', category: 'official', amount: 17850000, notes: 'Anahtar Teslim & İskan Masrafları', invoice_url: 'https://example.com/invoice-yak-01.pdf', date: '2026-04-10' },
+      ],
     };
   }
 }

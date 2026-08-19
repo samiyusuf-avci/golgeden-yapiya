@@ -224,6 +224,11 @@ func (r *Repository) UpdateProjectVisibility(id string, visibility models.Visibi
 	return err
 }
 
+func (r *Repository) DeleteProject(id string) error {
+	_, err := r.db.Exec(`DELETE FROM projects WHERE id = ?`, id)
+	return err
+}
+
 // Floor & Unit Methods
 func (r *Repository) CreateFloor(f *models.BuildingFloor) error {
 	_, err := r.db.Exec(`INSERT INTO building_floors (id, project_id, floor_number, name, is_completed) VALUES (?, ?, ?, ?, ?)`,

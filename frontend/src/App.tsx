@@ -1,69 +1,136 @@
 import { useEffect, useState } from 'react';
-import type { Project, UserRole, VisibilityType, Expense } from './types';
+import type { Project, VisibilityType, Expense, MainTab, UserProfile } from './types';
 import { ApiService } from './api';
+import { enforceCascadeStageState } from './utils/stageDependencies';
 import { Navbar } from './components/Navbar';
 import { ProjectCardGrid } from './components/ProjectCardGrid';
 import { MetricsGrid } from './components/MetricsGrid';
 import { BuildingViewer } from './components/BuildingViewer';
 import { BudgetCharts } from './components/BudgetCharts';
 import { ContractorDashboard } from './components/ContractorDashboard';
-import { ClientViewer } from './components/ClientViewer';
 import { CreateProjectModal } from './components/CreateProjectModal';
+import { ProfileView } from './components/ProfileView';
+import { FollowingView } from './components/FollowingView';
 import {
   Building2,
-  ShieldCheck,
   LayoutGrid,
-  CheckSquare,
-  Receipt,
-  Settings,
-  Lock,
+  ArrowLeft,
+  Clock,
+  CheckCircle2
 } from 'lucide-react';
 
 export function App() {
-  const [activeRole, setActiveRole] = useState<UserRole>('contractor');
+  const [mainTab, setMainTab] = useState<MainTab>(() => {
+    const saved = localStorage.getItem('golgeden_main_tab');
+    return (saved as MainTab) || 'my-projects';
+  });
+  const [projectFilter, setProjectFilter] = useState<'all' | 'ongoing' | 'completed'>('all');
+  const [isDetailView, setIsDetailView] = useState<boolean>(() => {
+    return localStorage.getItem('golgeden_is_detail_view') === 'true';
+  });
+  const [detailSubTab, setDetailSubTab] = useState<'viewer' | 'stages' | 'finances' | 'settings'>(() => {
+    const saved = localStorage.getItem('golgeden_detail_sub_tab');
+    return (saved as any) || 'viewer';
+  });
+
   const [projects, setProjects] = useState<Project[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'viewer' | 'stages' | 'finances' | 'settings'>('viewer');
+  const [followedProjects, setFollowedProjects] = useState<Project[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => {
+    return localStorage.getItem('golgeden_active_project_id') || null;
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [userProfile, setUserProfile] = useState<UserProfile>(ApiService.getUserProfile());
+
+  // State Persistence Effects
+  useEffect(() => {
+    if (activeProjectId) {
+      localStorage.setItem('golgeden_active_project_id', activeProjectId);
+    }
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    localStorage.setItem('golgeden_is_detail_view', String(isDetailView));
+  }, [isDetailView]);
+
+  useEffect(() => {
+    localStorage.setItem('golgeden_detail_sub_tab', detailSubTab);
+  }, [detailSubTab]);
+
+  useEffect(() => {
+    localStorage.setItem('golgeden_main_tab', mainTab);
+  }, [mainTab]);
 
   // Load All Projects
-  const loadProjects = async (role: UserRole = activeRole) => {
+  const loadProjects = async () => {
     setLoading(true);
     try {
-      const list = await ApiService.getProjects(role);
+      const list = await ApiService.getProjects('contractor');
       setProjects(list);
+
+      if (list.length > 1) {
+        setFollowedProjects([list[1]]);
+      }
+
       if (list.length > 0) {
-        // Keep currently selected or default to first
         setActiveProjectId((prev) => {
+          const storedId = localStorage.getItem('golgeden_active_project_id');
+          if (storedId && list.some((p) => p.id === storedId)) return storedId;
           if (prev && list.some((p) => p.id === prev)) return prev;
           return list[0].id;
         });
       }
     } catch (err) {
       console.error('Failed to load projects:', err);
-    } fontally: {
+    } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadProjects(activeRole);
-  }, [activeRole]);
+    loadProjects();
+  }, []);
 
   const activeProject = projects.find((p) => p.id === activeProjectId) || projects[0] || null;
 
   const updateActiveProjectInState = (updated: Project) => {
-    setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-  };
-
-  const handleRoleChange = (newRole: UserRole) => {
-    setActiveRole(newRole);
+    setProjects((prev) => {
+      const next = prev.map((p) => (p.id === updated.id ? updated : p));
+      ApiService.saveProjectsToStorage(next);
+      return next;
+    });
+    setFollowedProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   };
 
   const handleSelectProject = (project: Project) => {
     setActiveProjectId(project.id);
-    setActiveTab('viewer');
+    setIsDetailView(true);
+    setDetailSubTab('viewer');
+    setMainTab('my-projects');
+  };
+
+  const handleToggleFollow = (projectId: string) => {
+    const isAlreadyFollowing = followedProjects.some((p) => p.id === projectId);
+    if (isAlreadyFollowing) {
+      setFollowedProjects((prev) => prev.filter((p) => p.id !== projectId));
+    } else {
+      const target = projects.find((p) => p.id === projectId);
+      if (target) {
+        setFollowedProjects((prev) => [...prev, target]);
+      }
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    await ApiService.deleteProject(projectId);
+    const updated = projects.filter((p) => p.id !== projectId);
+    setProjects(updated);
+    setFollowedProjects((prev) => prev.filter((p) => p.id !== projectId));
+    ApiService.saveProjectsToStorage(updated);
+    localStorage.setItem('golgeden_is_detail_view', 'false');
+    localStorage.removeItem('golgeden_active_project_id');
+    setIsDetailView(false);
+    setActiveProjectId(updated.length > 0 ? updated[0].id : null);
   };
 
   const handleCreateNewProject = async (data: {
@@ -91,7 +158,8 @@ export function App() {
       }
       setProjects((prev) => [newProj, ...prev]);
       setActiveProjectId(newProj.id);
-      setActiveTab('viewer');
+      setIsDetailView(true);
+      setDetailSubTab('viewer');
     } catch (err) {
       console.warn('Backend unavailable, constructing new project locally', err);
       // Create local project structure
@@ -194,7 +262,8 @@ export function App() {
 
       setProjects((prev) => [localNewProject, ...prev]);
       setActiveProjectId(localNewProject.id);
-      setActiveTab('viewer');
+      setIsDetailView(true);
+      setDetailSubTab('viewer');
     } finally {
       setLoading(false);
     }
@@ -209,7 +278,7 @@ export function App() {
       activeProject.id,
       visibility,
       showFinancials,
-      activeRole
+      'contractor'
     );
     updateActiveProjectInState(updated);
   };
@@ -233,9 +302,9 @@ export function App() {
     updateActiveProjectInState(updatedProj);
   };
 
-  const handleToggleFloorStage = async (floorId: string, stageId: string, isCompleted: boolean) => {
+  const handleToggleFloorStage = (floorId: string, stageId: string, isCompleted: boolean) => {
     if (!activeProject || !activeProject.floors) return;
-    await ApiService.updateStage(stageId, isCompleted);
+    ApiService.updateStage(stageId, isCompleted);
 
     const newFloors = activeProject.floors.map((f) => {
       if (f.id === floorId && f.stages) {
@@ -251,9 +320,9 @@ export function App() {
     recalculateAndSetProject(newFloors, activeProject.stages || []);
   };
 
-  const handleToggleUnitStage = async (unitId: string, stageId: string, isCompleted: boolean) => {
+  const handleToggleUnitStage = (unitId: string, stageId: string, isCompleted: boolean) => {
     if (!activeProject || !activeProject.floors) return;
-    await ApiService.updateStage(stageId, isCompleted);
+    ApiService.updateStage(stageId, isCompleted);
 
     const newFloors = activeProject.floors.map((f) => {
       if (!f.units) return f;
@@ -273,9 +342,9 @@ export function App() {
     recalculateAndSetProject(newFloors, activeProject.stages || []);
   };
 
-  const handleToggleProjectStage = async (stageId: string, isCompleted: boolean) => {
+  const handleToggleProjectStage = (stageId: string, isCompleted: boolean) => {
     if (!activeProject || !activeProject.stages) return;
-    await ApiService.updateStage(stageId, isCompleted);
+    ApiService.updateStage(stageId, isCompleted);
 
     const newProjectStages = activeProject.stages.map((st) =>
       st.id === stageId ? { ...st, is_completed: isCompleted } : st
@@ -286,15 +355,27 @@ export function App() {
 
   const recalculateAndSetProject = (floors: any[], projectStages: any[]) => {
     if (!activeProject) return;
+
+    // 1. Construct temporary project object
+    const rawProj: Project = {
+      ...activeProject,
+      floors,
+      stages: projectStages,
+    };
+
+    // 2. Enforce cascade rules (if a lower stage was uncompleted, cascade reset dependent upper stages)
+    const sanitizedProj = enforceCascadeStageState(rawProj);
+
+    // 3. Recalculate physical progress on sanitized project
     let totalWeight = 0;
     let completedWeight = 0;
 
-    projectStages.forEach((st) => {
+    sanitizedProj.stages?.forEach((st) => {
       totalWeight += st.weight_percentage;
       if (st.is_completed) completedWeight += st.weight_percentage;
     });
 
-    floors.forEach((f) => {
+    sanitizedProj.floors?.forEach((f) => {
       f.stages?.forEach((st: any) => {
         totalWeight += st.weight_percentage;
         if (st.is_completed) completedWeight += st.weight_percentage;
@@ -310,16 +391,31 @@ export function App() {
     const newPhysProgress = totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 1000) / 10 : 0;
 
     const updatedProj: Project = {
-      ...activeProject,
-      floors,
-      stages: projectStages,
+      ...sanitizedProj,
       physical_progress: newPhysProgress,
+      status: newPhysProgress >= 100 ? 'completed' : (sanitizedProj.status === 'completed' ? 'active' : sanitizedProj.status),
     };
+
+    ApiService.saveProjectsToStorage(
+      projects.map((p) => (p.id === updatedProj.id ? updatedProj : p))
+    );
     updateActiveProjectInState(updatedProj);
   };
 
-  const isClientHidden =
-    activeRole === 'client' && (!activeProject || !activeProject.show_financials_to_clients);
+  // Filtered projects for the 3 tabs: Tüm Projelerim, Devam Eden Projelerim, Biten Projelerim
+  const ongoingProjects = projects.filter(
+    (p) => p.status !== 'completed' && p.physical_progress < 100
+  );
+  const completedProjects = projects.filter(
+    (p) => p.status === 'completed' || p.physical_progress >= 100
+  );
+
+  const displayedProjects =
+    projectFilter === 'ongoing'
+      ? ongoingProjects
+      : projectFilter === 'completed'
+      ? completedProjects
+      : projects;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
@@ -330,214 +426,241 @@ export function App() {
         onCreateProject={handleCreateNewProject}
       />
 
-      {/* Top Main Navbar */}
+      {/* Main Top Navbar */}
       <Navbar
-        projects={projects}
-        activeProject={activeProject}
-        onSelectProject={handleSelectProject}
-        activeRole={activeRole}
-        onRoleChange={handleRoleChange}
-        onOpenPortfolio={() => setActiveTab('portfolio')}
+        activeMainTab={mainTab}
+        onSelectMainTab={(tab) => {
+          setMainTab(tab);
+          if (tab === 'my-projects') setIsDetailView(false);
+        }}
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
-        onSeedDemo={() => loadProjects(activeRole)}
+        userProfile={userProfile}
       />
 
-      {/* Main Container */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center animate-spin mb-4 shadow-lg shadow-amber-500/20">
               <Building2 className="w-7 h-7" />
             </div>
-            <h2 className="text-xl font-bold text-white">İnşaat Verileri Yükleniyor...</h2>
-            <p className="text-xs text-slate-400 mt-1">Gölgeden Yapıya çoklu proje servisi senkronize ediliyor</p>
+            <h2 className="text-xl font-bold text-white">Şantiye Verileri Yükleniyor...</h2>
+            <p className="text-xs text-slate-400 mt-1">Gölgeden Yapıya dijital şantiye platformu senkronize ediliyor</p>
           </div>
         ) : (
           <>
-            {/* Top Sub-Navigation Tabs Bar */}
-            <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 p-2 rounded-3xl flex items-center justify-between overflow-x-auto gap-2 shadow-2xl">
-              <div className="flex items-center gap-1.5 min-w-max">
-                <button
-                  onClick={() => setActiveTab('portfolio')}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    activeTab === 'portfolio'
-                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                  <span>Portföy (Tüm İnşaatlar)</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('viewer')}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    activeTab === 'viewer'
-                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  <Building2 className="w-4 h-4" />
-                  <span>Bina Görselleştirici</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('stages')}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    activeTab === 'stages'
-                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  <CheckSquare className="w-4 h-4" />
-                  <span>{activeRole === 'contractor' ? 'Aşama & İmalat Yönetimi' : 'Daire Takibi & Saha'}</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('finances')}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    activeTab === 'finances'
-                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  <Receipt className="w-4 h-4" />
-                  <span>Finans & Gider Analizi</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('settings')}
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    activeTab === 'settings'
-                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  <Settings className="w-4 h-4" />
-                  <span>Gizlilik & Ayarlar</span>
-                </button>
-              </div>
-
-              {/* Active Role Indicator Badge */}
-              <div className="hidden lg:flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-2xl text-xs">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                <span className="text-slate-400 font-semibold">
-                  {activeRole === 'contractor' ? 'Müteahhit Modu' : 'Müşteri Modu'}
-                </span>
-              </div>
-            </div>
-
-            {/* TAB CONTENT RENDERING */}
-
-            {/* Tab 1: All Projects Portfolio Gallery */}
-            {activeTab === 'portfolio' && (
-              <ProjectCardGrid
-                projects={projects}
-                activeProjectId={activeProjectId}
-                onSelectProject={handleSelectProject}
-                onOpenCreateModal={() => setIsCreateModalOpen(true)}
-                activeRole={activeRole}
-              />
-            )}
-
-            {/* Tab 2: Selected Project Building Viewer & Architectural Blueprint */}
-            {activeTab === 'viewer' && activeProject && (
+            {/* MAIN TAB 1: PROJELERİM */}
+            {mainTab === 'my-projects' && (
               <div className="space-y-6">
-                <MetricsGrid project={activeProject} isClientHidden={isClientHidden} activeRole={activeRole} />
-                <BuildingViewer
-                  floors={activeProject.floors || []}
-                  onToggleFloorStage={handleToggleFloorStage}
-                  onToggleUnitStage={handleToggleUnitStage}
-                  isContractor={activeRole === 'contractor'}
-                />
-              </div>
-            )}
-
-            {/* Tab 3: Stages, Checklists & Site Updates */}
-            {activeTab === 'stages' && activeProject && (
-              activeRole === 'contractor' ? (
-                <ContractorDashboard
-                  project={activeProject}
-                  onUpdateVisibility={handleUpdateVisibility}
-                  onAddExpense={handleAddExpense}
-                  onToggleStage={handleToggleProjectStage}
-                  onCreateNewProject={handleCreateNewProject}
-                  initialTab="stages"
-                />
-              ) : (
-                <ClientViewer project={activeProject} isClientHidden={isClientHidden} />
-              )
-            )}
-
-            {/* Tab 4: Financial Charts & Expenses Logger */}
-            {activeTab === 'finances' && activeProject && (
-              <div className="space-y-6">
-                {isClientHidden ? (
-                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 text-center max-w-xl mx-auto space-y-4 shadow-2xl">
-                    <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
-                      <Lock className="w-7 h-7" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white">Finansal Veriler Gizli</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Bu projenin harcama ve bütçe ayrıntıları müteahhit tarafından müşteri gizlilik ayarlarına uygun olarak maskelenmiştir.
-                    </p>
-                  </div>
-                ) : (
+                {!isDetailView ? (
                   <>
-                    {activeRole === 'contractor' && (
+                    {/* Sub-Navigation Bar: ONLY 3 TABS (Tüm Projelerim, Devam Eden Projelerim, Biten Projelerim) */}
+                    <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 p-2 rounded-3xl flex items-center justify-between overflow-x-auto gap-2 shadow-2xl">
+                      <div className="flex items-center gap-2 min-w-max">
+                        <button
+                          onClick={() => setProjectFilter('all')}
+                          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                            projectFilter === 'all'
+                              ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-lg shadow-amber-500/25'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                          }`}
+                        >
+                          <LayoutGrid className="w-4 h-4" />
+                          <span>Tüm Projelerim ({projects.length})</span>
+                        </button>
+
+                        <button
+                          onClick={() => setProjectFilter('ongoing')}
+                          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                            projectFilter === 'ongoing'
+                              ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-lg shadow-amber-500/25'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                          }`}
+                        >
+                          <Clock className="w-4 h-4" />
+                          <span>Devam Eden Projelerim ({ongoingProjects.length})</span>
+                        </button>
+
+                        <button
+                          onClick={() => setProjectFilter('completed')}
+                          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                            projectFilter === 'completed'
+                              ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-lg shadow-amber-500/25'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Biten Projelerim ({completedProjects.length})</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filtered Project Cards Grid */}
+                    <ProjectCardGrid
+                      projects={displayedProjects}
+                      activeProjectId={activeProjectId}
+                      onSelectProject={handleSelectProject}
+                      onOpenCreateModal={() => setIsCreateModalOpen(true)}
+                      activeRole="contractor"
+                    />
+                  </>
+                ) : (
+                  /* PROJECT DETAIL VIEW WITH BACK BUTTON */
+                  <div className="space-y-6">
+                    {/* Top Detail Header Bar */}
+                    <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+                      <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <button
+                          onClick={() => setIsDetailView(false)}
+                          className="bg-slate-950 hover:bg-slate-800 text-amber-400 border border-slate-800 hover:border-amber-500/40 px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md"
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                          <span>Projelerim Listesine Dön</span>
+                        </button>
+
+                        {activeProject && (
+                          <div className="hidden md:block">
+                            <h3 className="text-base font-bold text-white leading-tight">
+                              {activeProject.name}
+                            </h3>
+                            <p className="text-[11px] text-slate-400">{activeProject.location}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Detail Sub Tabs */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+                        <button
+                          onClick={() => setDetailSubTab('viewer')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                            detailSubTab === 'viewer'
+                              ? 'bg-amber-500 text-slate-950 shadow-md'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          3D Görselleştirici
+                        </button>
+                        <button
+                          onClick={() => setDetailSubTab('stages')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                            detailSubTab === 'stages'
+                              ? 'bg-amber-500 text-slate-950 shadow-md'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Aşama & İmalat
+                        </button>
+                        <button
+                          onClick={() => setDetailSubTab('finances')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                            detailSubTab === 'finances'
+                              ? 'bg-amber-500 text-slate-950 shadow-md'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Finans & Gider
+                        </button>
+                        <button
+                          onClick={() => setDetailSubTab('settings')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                            detailSubTab === 'settings'
+                              ? 'bg-amber-500 text-slate-950 shadow-md'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Ayarlar
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Detail Active View Content */}
+                    {activeProject && detailSubTab === 'viewer' && (
+                      <div className="space-y-6">
+                        <MetricsGrid project={activeProject} isClientHidden={false} activeRole="contractor" />
+                        <BuildingViewer
+                          project={activeProject}
+                          floors={activeProject.floors || []}
+                          onToggleFloorStage={handleToggleFloorStage}
+                          onToggleUnitStage={handleToggleUnitStage}
+                          isContractor={true}
+                        />
+                      </div>
+                    )}
+
+                    {activeProject && detailSubTab === 'stages' && (
                       <ContractorDashboard
                         project={activeProject}
                         onUpdateVisibility={handleUpdateVisibility}
                         onAddExpense={handleAddExpense}
                         onToggleStage={handleToggleProjectStage}
                         onCreateNewProject={handleCreateNewProject}
-                        initialTab="expenses"
+                        onDeleteProject={handleDeleteProject}
+                        initialTab="stages"
                       />
                     )}
-                    <BudgetCharts project={activeProject} isClientHidden={isClientHidden} />
-                  </>
+
+                    {activeProject && detailSubTab === 'finances' && (
+                      <div className="space-y-6">
+                        <ContractorDashboard
+                          project={activeProject}
+                          onUpdateVisibility={handleUpdateVisibility}
+                          onAddExpense={handleAddExpense}
+                          onToggleStage={handleToggleProjectStage}
+                          onCreateNewProject={handleCreateNewProject}
+                          onDeleteProject={handleDeleteProject}
+                          initialTab="expenses"
+                        />
+                        <BudgetCharts project={activeProject} isClientHidden={false} />
+                      </div>
+                    )}
+
+                    {activeProject && detailSubTab === 'settings' && (
+                      <ContractorDashboard
+                        project={activeProject}
+                        onUpdateVisibility={handleUpdateVisibility}
+                        onAddExpense={handleAddExpense}
+                        onToggleStage={handleToggleProjectStage}
+                        onCreateNewProject={handleCreateNewProject}
+                        onDeleteProject={handleDeleteProject}
+                        initialTab="settings"
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Tab 5: Privacy & Visibility Settings */}
-            {activeTab === 'settings' && activeProject && (
-              <div className="space-y-6">
-                {activeRole === 'contractor' ? (
-                  <ContractorDashboard
-                    project={activeProject}
-                    onUpdateVisibility={handleUpdateVisibility}
-                    onAddExpense={handleAddExpense}
-                    onToggleStage={handleToggleProjectStage}
-                    onCreateNewProject={handleCreateNewProject}
-                    initialTab="settings"
-                  />
-                ) : (
-                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 text-center max-w-xl mx-auto space-y-4 shadow-2xl">
-                    <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
-                      <ShieldCheck className="w-7 h-7" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white">Müşteri Gizlilik & Erişim Politikası</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Müşteri modundasınız. Proje izinleriniz şeffaf izleme yetkisiyle tanımlanmıştır. Projenin genel görünürlüğü:{' '}
-                      <strong className="text-amber-400 uppercase">{activeProject.visibility}</strong>.
-                    </p>
-                  </div>
-                )}
-              </div>
+            {/* MAIN TAB 2: TAKİP ETTİKLERİM */}
+            {mainTab === 'following' && (
+              <FollowingView
+                followedProjects={followedProjects}
+                allProjects={projects}
+                onSelectProject={handleSelectProject}
+                onToggleFollow={handleToggleFollow}
+              />
+            )}
+
+            {/* MAIN TAB 3: PROFİL */}
+            {mainTab === 'profile' && (
+              <ProfileView
+                profile={userProfile}
+                projects={projects}
+                followedProjects={followedProjects}
+                onUpdateProfile={(updated) => setUserProfile(updated)}
+              />
             )}
           </>
         )}
       </main>
 
-      {/* Footer */}
+      {/* Main Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-500 mt-12">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-amber-500" />
             <span className="font-bold text-slate-400">Gölgeden Yapıya Platformu</span>
           </div>
-          <span>Çoklu İnşaat & Canlı Doku Takip Sistemi • React TypeScript</span>
+          <span>Şeffaf Proje Takip & Canlı Şantiye Portalı • React TypeScript</span>
         </div>
       </footer>
     </div>

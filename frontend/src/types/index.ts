@@ -1,12 +1,37 @@
-export type UserRole = 'contractor' | 'client';
+export type UserRole = 'contractor' | 'client' | 'user';
 export type VisibilityType = 'private' | 'protected' | 'public';
 export type ExpenseCategory = 'material' | 'labor' | 'official' | 'subcontractor';
+export type MainTab = 'my-projects' | 'following' | 'profile';
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  title: string;
+  company: string;
+  email: string;
+  phone: string;
+  location: string;
+  avatar_url?: string;
+  bio?: string;
+  stats: {
+    total_managed_projects: number;
+    total_following_projects: number;
+    total_budget_managed: number;
+    total_units_completed: number;
+  };
+  settings: {
+    email_notifications: boolean;
+    site_updates_push: boolean;
+    dark_mode: boolean;
+    public_profile: boolean;
+  };
+}
 
 export interface User {
   id: string;
   email: string;
   name: string;
-  role: UserRole;
+  role?: UserRole;
   created_at?: string;
 }
 
@@ -56,6 +81,17 @@ export interface Expense {
   created_at?: string;
 }
 
+export interface ProjectActivity {
+  id: string;
+  project_id: string;
+  project_name: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  type: 'stage_complete' | 'expense_added' | 'photo_upload' | 'status_change';
+  image_url?: string;
+}
+
 export interface Project {
   id: string;
   contractor_id: string;
@@ -68,6 +104,9 @@ export interface Project {
   description?: string;
   status?: 'active' | 'planning' | 'completed';
   unit_count?: number;
+  is_following?: boolean;
+  last_update_date?: string;
+  contractor_name?: string;
   
   // Derived metrics
   physical_progress: number;
@@ -78,10 +117,25 @@ export interface Project {
   floors?: BuildingFloor[];
   expenses?: Expense[];
   stages?: Stage[];
+  activities?: ProjectActivity[];
 }
 
 export interface AuthState {
   user: User | null;
   token: string | null;
-  activeRole: UserRole;
 }
+
+export const getProjectUnitCount = (project: Project): number => {
+  if (project.floors && project.floors.length > 0) {
+    const totalFromFloors = project.floors.reduce(
+      (acc, floor) => acc + (floor.units?.length || 0),
+      0
+    );
+    if (totalFromFloors > 0) return totalFromFloors;
+  }
+  if (typeof project.unit_count === 'number' && project.unit_count > 0) {
+    return project.unit_count;
+  }
+  return 0;
+};
+

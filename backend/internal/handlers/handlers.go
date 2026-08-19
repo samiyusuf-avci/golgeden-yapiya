@@ -171,6 +171,15 @@ func (h *APIHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		req.Visibility = models.VisibilityPrivate
 	}
 
+	floorCount := req.FloorCount
+	if floorCount <= 0 {
+		floorCount = 4
+	}
+	unitsPerFloor := req.UnitsPerFloor
+	if unitsPerFloor <= 0 {
+		unitsPerFloor = 2
+	}
+
 	project := &models.Project{
 		ID:                      projectID,
 		ContractorID:            contractorID,
@@ -179,6 +188,7 @@ func (h *APIHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		TotalBudget:             req.TotalBudget,
 		Visibility:              req.Visibility,
 		ShowFinancialsToClients: req.ShowFinancialsToClients,
+		UnitCount:               floorCount * unitsPerFloor,
 	}
 
 	if err := h.repo.CreateProject(project); err != nil {
@@ -343,6 +353,21 @@ func (h *APIHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
 
 	h.progressService.CalculateProjectMetrics(project)
 	respondJSON(w, http.StatusOK, project)
+}
+
+func (h *APIHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		respondError(w, http.StatusBadRequest, "Missing project ID")
+		return
+	}
+
+	if err := h.repo.DeleteProject(projectID); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to delete project")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Project deleted successfully"})
 }
 
 // Stage Handlers

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import type { BuildingFloor, Unit } from '../types';
-import { Building2, CheckCircle2, CircleDashed, Sparkles, Layers, Eye, Home, ChevronRight } from 'lucide-react';
+import type { BuildingFloor, Project } from '../types';
+import { Building2, CheckCircle2, CircleDashed, Sparkles, Layers, Eye, Home, ChevronRight, Lock, AlertTriangle } from 'lucide-react';
+import { checkFloorStageStatus, checkUnitStageStatus, checkRoofStatus } from '../utils/stageDependencies';
 
 interface BuildingViewerProps {
+  project?: Project;
   floors: BuildingFloor[];
   onToggleFloorStage?: (floorId: string, stageId: string, isCompleted: boolean) => void;
   onToggleUnitStage?: (unitId: string, stageId: string, isCompleted: boolean) => void;
@@ -10,31 +12,55 @@ interface BuildingViewerProps {
 }
 
 export const BuildingViewer: React.FC<BuildingViewerProps> = ({
+  project,
   floors = [],
   onToggleFloorStage,
   onToggleUnitStage,
   isContractor = true,
 }) => {
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
-  const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'live' | 'shadow'>('all');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const selectedFloor = floors.find((f) => f.id === selectedFloorId);
+  const selectedUnit = selectedFloor?.units?.find((u) => u.id === selectedUnitId) || null;
 
   const calculateFloorProgress = (floor: BuildingFloor): number => {
-    if (!floor.stages || floor.stages.length === 0) {
+    let totalItems = 0;
+    let completedItems = 0;
+
+    if (floor.stages && floor.stages.length > 0) {
+      totalItems += floor.stages.length;
+      completedItems += floor.stages.filter((s) => s.is_completed).length;
+    }
+
+    if (floor.units && floor.units.length > 0) {
+      floor.units.forEach((u) => {
+        if (u.stages && u.stages.length > 0) {
+          totalItems += u.stages.length;
+          completedItems += u.stages.filter((s) => s.is_completed).length;
+        } else {
+          totalItems += 1;
+          if (u.is_completed) completedItems += 1;
+        }
+      });
+    }
+
+    if (totalItems === 0) {
       return floor.is_completed ? 100 : 0;
     }
-    const completed = floor.stages.filter((s) => s.is_completed).length;
-    return Math.round((completed / floor.stages.length) * 100);
+
+    return Math.round((completedItems / totalItems) * 100);
   };
 
   const roofFloor = floors.find((f) => f.floor_number === floors.length);
-  const isRoofDone = roofFloor ? (roofFloor.is_completed || calculateFloorProgress(roofFloor) === 100) : false;
+  const roofDep = project ? checkRoofStatus(project) : { isUnlocked: true };
+  const isRoofDone = roofFloor && roofDep.isUnlocked ? (roofFloor.is_completed || calculateFloorProgress(roofFloor) === 100) : false;
 
   const filteredFloors = floors.filter((floor) => {
     const progress = calculateFloorProgress(floor);
-    const isFullyDone = floor.is_completed || progress === 100;
+    const isFullyDone = progress === 100;
     if (filterMode === 'live') return isFullyDone;
     if (filterMode === 'shadow') return !isFullyDone;
     return true;
@@ -131,22 +157,24 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
           {/* Floor & Apartment Units Layer Stack */}
           <div className="w-full max-w-md space-y-3 relative">
             {filteredFloors.length > 0 ? (
-              filteredFloors.map((floor) => {
+              [...filteredFloors]
+                .sort((a, b) => b.floor_number - a.floor_number)
+                .map((floor) => {
               const isSelected = selectedFloorId === floor.id;
               const progress = calculateFloorProgress(floor);
-              const isFullyDone = floor.is_completed || progress === 100;
+              const isFullyDone = progress === 100;
 
               return (
                 <div
                   key={floor.id}
                   onClick={() => {
                     setSelectedFloorId(isSelected ? null : floor.id);
-                    setSelectedUnit(null);
+                    setSelectedUnitId(null);
                   }}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setSelectedFloorId(floor.id);
-                    setSelectedUnit(null);
+                    setSelectedUnitId(null);
                   }}
                   className={`
                     relative cursor-pointer transition-all duration-500 transform rounded-2xl border p-4 group
@@ -175,13 +203,13 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                     <div className="flex items-center gap-3">
                       {/* Floor Number Badge */}
                       <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-sm transition-all duration-300 ${
+                        className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-xs transition-all duration-300 ${
                           isFullyDone
                             ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/50'
                             : 'bg-slate-800 text-slate-400 group-hover:text-white'
                         }`}
                       >
-                        {floor.floor_number}K
+                        {floor.floor_number}.K
                       </div>
 
                       <div>
@@ -236,7 +264,7 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedFloorId(isSelected ? null : floor.id);
-                          setSelectedUnit(null);
+                          setSelectedUnitId(null);
                         }}
                         onContextMenu={(e) => {
                           e.preventDefault();
@@ -272,6 +300,22 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
 
         {/* Right Column: Detailed Floor & Apartment Inspection Panel */}
         <div className="lg:col-span-6 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 min-h-[480px] flex flex-col shadow-2xl">
+          {toastMessage && (
+            <div className="mb-4 p-3 bg-rose-500/20 border border-rose-500/50 rounded-xl flex items-center justify-between text-rose-200 text-xs animate-shake">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{toastMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToastMessage(null)}
+                className="text-rose-400 font-bold hover:text-white ml-2 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {selectedFloor ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -298,48 +342,87 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                     Katın Yapısal İmalat Aşamaları
                   </h4>
                   <div className="space-y-2">
-                    {selectedFloor.stages.map((stage) => (
-                      <div
-                        key={stage.id}
-                        className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
-                          stage.is_completed
-                            ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
-                            : 'bg-slate-800/40 border-slate-700/60 text-slate-400'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <button
-                            disabled={!isContractor}
-                            onClick={() =>
-                              onToggleFloorStage?.(selectedFloor.id, stage.id, !stage.is_completed)
-                            }
-                            className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
-                              stage.is_completed
-                                ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
-                                : 'border-slate-600 bg-slate-900 hover:border-amber-400 cursor-pointer'
-                            }`}
-                          >
-                            {stage.is_completed && <CheckCircle2 className="w-4 h-4 stroke-[3]" />}
-                          </button>
-                          <div>
-                            <div className="text-sm font-bold text-white">{stage.name}</div>
-                            <div className="text-[11px] text-slate-400">
-                              Ağırlık: %{stage.weight_percentage} • Tahmini Maliyet: {stage.estimated_cost.toLocaleString('tr-TR')} ₺
-                            </div>
-                          </div>
-                        </div>
+                    {selectedFloor?.stages?.map((stage) => {
+                      const depStatus = project
+                        ? checkFloorStageStatus(project, selectedFloor.id, stage.id)
+                        : { isUnlocked: true };
 
-                        <span
-                          className={`text-xs px-2.5 py-1 rounded-full font-bold ${
-                            stage.is_completed
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      const isLocked = !stage.is_completed && !depStatus.isUnlocked;
+
+                      const handleStageClick = () => {
+                        if (!isContractor) return;
+                        if (isLocked) {
+                          setToastMessage(depStatus.reason || 'Bu aşama kilitlidir.');
+                          return;
+                        }
+                        setToastMessage(null);
+                        onToggleFloorStage?.(selectedFloor.id, stage.id, !stage.is_completed);
+                      };
+
+                      return (
+                        <div
+                          key={stage.id}
+                          onClick={handleStageClick}
+                          className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
+                            isLocked
+                              ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
+                              : stage.is_completed
+                              ? 'bg-amber-500/10 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60'
+                              : 'bg-slate-800/40 border-slate-700/60 text-slate-400 cursor-pointer hover:border-amber-500/60'
                           }`}
                         >
-                          {stage.is_completed ? 'Canlı / Tamamlandı' : 'Gölge / Bekliyor'}
-                        </span>
-                      </div>
-                    ))}
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
+                                isLocked
+                                  ? 'border-slate-700 bg-slate-900/50 text-slate-600 cursor-not-allowed'
+                                  : stage.is_completed
+                                  ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
+                                  : 'border-slate-600 bg-slate-900 hover:border-amber-400 cursor-pointer'
+                              }`}
+                            >
+                              {stage.is_completed ? (
+                                <CheckCircle2 key="chk-completed" className="w-4 h-4 stroke-[3]" />
+                              ) : isLocked ? (
+                                <Lock key="chk-locked" className="w-3 h-3 text-slate-500" />
+                              ) : null}
+                            </span>
+                            <div>
+                              <div className="text-sm font-bold text-white flex items-center gap-2">
+                                <span>{stage.name}</span>
+                                {isLocked && (
+                                  <span className="text-[10px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded font-normal flex items-center gap-1">
+                                    <Lock className="w-2.5 h-2.5" /> Kilitli
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400">
+                                Ağırlık: %{stage.weight_percentage || 0} • Tahmini Maliyet: {(stage.estimated_cost || 0).toLocaleString('tr-TR')} ₺
+                              </div>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`text-xs px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1.5 ${
+                              isLocked
+                                ? 'bg-slate-900 text-rose-400 border border-rose-500/30'
+                                : stage.is_completed
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}
+                          >
+                            {isLocked && <Lock className="w-3 h-3 shrink-0" />}
+                            <span>
+                              {isLocked
+                                ? 'Kilitli (Ön Koşul)'
+                                : stage.is_completed
+                                ? 'Canlı / Tamamlandı'
+                                : 'Gölge / Bekliyor'}
+                            </span>
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -355,14 +438,14 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
 
                 <div className="grid grid-cols-2 gap-3">
                   {selectedFloor.units?.map((unit) => {
-                    const isUnitSelected = selectedUnit?.id === unit.id;
+                    const isUnitSelected = selectedUnitId === unit.id;
                     return (
                       <div
                         key={unit.id}
-                        onClick={() => setSelectedUnit(isUnitSelected ? null : unit)}
+                        onClick={() => setSelectedUnitId(isUnitSelected ? null : unit.id)}
                         onContextMenu={(e) => {
                           e.preventDefault();
-                          setSelectedUnit(isUnitSelected ? null : unit);
+                          setSelectedUnitId(isUnitSelected ? null : unit.id);
                         }}
                         className={`
                           p-4 rounded-xl border cursor-pointer transition-all duration-300 relative overflow-hidden group
@@ -407,32 +490,65 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                     </span>
                   </div>
 
-                  {selectedUnit.stages && selectedUnit.stages.length > 0 ? (
+                  {selectedUnit?.stages && selectedUnit.stages.length > 0 ? (
                     <div className="space-y-2">
-                      {selectedUnit.stages.map((st) => (
-                        <div
-                          key={st.id}
-                          className="flex items-center justify-between text-xs p-2.5 bg-slate-900 rounded-lg border border-slate-800"
-                        >
-                          <div className="flex items-center gap-2">
-                            <button
-                              disabled={!isContractor}
-                              onClick={() =>
-                                onToggleUnitStage?.(selectedUnit.id, st.id, !st.is_completed)
-                              }
-                              className={`w-4 h-4 rounded flex items-center justify-center border ${
-                                st.is_completed
-                                  ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
-                                  : 'border-slate-600 cursor-pointer'
-                              }`}
-                            >
-                              {st.is_completed && <CheckCircle2 className="w-3 h-3 stroke-[3]" />}
-                            </button>
-                            <span className="text-white font-medium">{st.name}</span>
+                      {selectedUnit.stages.map((st) => {
+                        const unitDep = project
+                          ? checkUnitStageStatus(project, selectedUnit.id, st.id)
+                          : { isUnlocked: true };
+                        const isUnitStLocked = !st.is_completed && !unitDep.isUnlocked;
+
+                        const handleUnitStageClick = () => {
+                          if (!isContractor) return;
+                          if (isUnitStLocked) {
+                            setToastMessage(unitDep.reason || 'Bu daire imalatı kilitlidir.');
+                            return;
+                          }
+                          setToastMessage(null);
+                          onToggleUnitStage?.(selectedUnit.id, st.id, !st.is_completed);
+                        };
+
+                        return (
+                          <div
+                            key={st.id}
+                            onClick={handleUnitStageClick}
+                            className={`flex items-center justify-between text-xs p-2.5 rounded-lg border transition-all ${
+                              isUnitStLocked
+                                ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
+                                : st.is_completed
+                                ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
+                                : 'bg-slate-900 border-slate-800 text-slate-400 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                                  isUnitStLocked
+                                    ? 'border-slate-700 bg-slate-950 text-slate-600 cursor-not-allowed'
+                                    : st.is_completed
+                                    ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
+                                    : 'border-slate-600 cursor-pointer'
+                                }`}
+                              >
+                                {st.is_completed ? (
+                                  <CheckCircle2 key="uchk-completed" className="w-3 h-3 stroke-[3]" />
+                                ) : isUnitStLocked ? (
+                                  <Lock key="uchk-locked" className="w-2.5 h-2.5 text-slate-500" />
+                                ) : null}
+                              </span>
+                              <span className="text-white font-medium flex items-center gap-1.5">
+                                <span>{st.name}</span>
+                                {isUnitStLocked && (
+                                  <span className="text-[9px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1 py-0.2 rounded flex items-center gap-0.5">
+                                    <Lock className="w-2 h-2" /> Kilitli
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <span className="text-slate-400">{(st.estimated_cost || 0).toLocaleString('tr-TR')} ₺</span>
                           </div>
-                          <span className="text-slate-400">{st.estimated_cost.toLocaleString('tr-TR')} ₺</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-xs text-slate-400 italic text-center py-2">

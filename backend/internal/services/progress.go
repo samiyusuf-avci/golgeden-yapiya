@@ -69,6 +69,15 @@ func (s *ProgressService) CalculateProjectMetrics(project *models.Project) {
 		}
 	}
 
+	// 1b. Calculate Unit Count dynamically if not set
+	var calculatedUnits int = 0
+	for _, floor := range project.Floors {
+		calculatedUnits += len(floor.Units)
+	}
+	if calculatedUnits > 0 {
+		project.UnitCount = calculatedUnits
+	}
+
 	if totalWeight > 0 {
 		project.PhysicalProgress = math.Round((float64(completedWeight)/float64(totalWeight))*1000) / 10
 	} else {
