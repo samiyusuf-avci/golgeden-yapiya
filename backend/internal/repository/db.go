@@ -224,6 +224,15 @@ func (r *Repository) UpdateProjectVisibility(id string, visibility models.Visibi
 	return err
 }
 
+func (r *Repository) UpdateProject(id string, name string, location string, totalBudget float64, visibility models.VisibilityType, showFinancials bool) error {
+	_, err := r.db.Exec(
+		`UPDATE projects SET name = ?, location = ?, total_budget = ?, visibility = ?, show_financials_to_clients = ? WHERE id = ?`,
+		name, location, totalBudget, string(visibility), showFinancials, id,
+	)
+	return err
+}
+
+
 func (r *Repository) DeleteProject(id string) error {
 	_, err := r.db.Exec(`DELETE FROM projects WHERE id = ?`, id)
 	return err

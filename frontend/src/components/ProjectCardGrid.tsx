@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   Lock,
   Layers,
+  Tag,
+  CalendarCheck,
 } from 'lucide-react';
 
 export const getProjectFloorsCount = (project: Project): number => {
@@ -100,15 +102,28 @@ export const ProjectCardGrid: React.FC<ProjectCardGridProps> = ({
           const unitsPerFloor = getUnitsPerFloor(project);
           const totalUnits = getProjectUnitCount(project);
 
+          // Süre hesabı
+          const hedefSureAy = project.estimated_completion_months ?? null;
+          const kalanSureAy: number | null = (() => {
+            if (!hedefSureAy) return null;
+            const baslangic = project.created_at ? new Date(project.created_at) : null;
+            if (!baslangic) return null;
+            const now = new Date();
+            const gecenAy =
+              (now.getFullYear() - baslangic.getFullYear()) * 12 +
+              (now.getMonth() - baslangic.getMonth());
+            return Math.max(0, hedefSureAy - gecenAy);
+          })();
+          const isDelayed = kalanSureAy === 0 && project.physical_progress < 100;
+
           return (
             <div
               key={project.id}
               onClick={() => onSelectProject(project)}
-              className={`bg-slate-900/90 border rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between relative group cursor-pointer ${
-                isSelected
+              className={`bg-slate-900/90 border rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between relative group cursor-pointer ${isSelected
                   ? 'border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.2)] bg-slate-900'
                   : 'border-slate-800 hover:border-amber-500/60 hover:bg-slate-900/80 hover:shadow-xl'
-              }`}
+                }`}
             >
               <div>
                 {/* Top Badge & Active Indicator */}
@@ -166,8 +181,9 @@ export const ProjectCardGrid: React.FC<ProjectCardGridProps> = ({
                   </div>
                 </div>
 
-                {/* Quick Metrics (4 items) */}
+                {/* Quick Metrics (6 items) */}
                 <div className="grid grid-cols-2 gap-2 mb-6 text-xs">
+                  {/* Row 1, Col 1: Kat Sayısı */}
                   <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                     <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Sayısı</div>
                     <div className="font-bold text-white flex items-center gap-1 mt-0.5">
@@ -175,20 +191,7 @@ export const ProjectCardGrid: React.FC<ProjectCardGridProps> = ({
                     </div>
                   </div>
 
-                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
-                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Başı Daire</div>
-                    <div className="font-bold text-white flex items-center gap-1 mt-0.5">
-                      <Layers className="w-3.5 h-3.5 text-sky-400" /> {unitsPerFloor} Daire
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
-                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Toplam Daire</div>
-                    <div className="font-bold text-white flex items-center gap-1 mt-0.5">
-                      <Home className="w-3.5 h-3.5 text-emerald-400" /> {totalUnits} Adet Daire
-                    </div>
-                  </div>
-
+                  {/* Row 1, Col 2: Proje Bütçesi */}
                   <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                     <div className="text-[10px] text-slate-400 font-semibold uppercase">Proje Bütçesi</div>
                     <div className="font-bold text-white flex items-center gap-1 mt-0.5">
@@ -201,17 +204,64 @@ export const ProjectCardGrid: React.FC<ProjectCardGridProps> = ({
                       )}
                     </div>
                   </div>
+
+                  {/* Row 2, Col 1: Kat Başı Daire */}
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Başı Daire</div>
+                    <div className="font-bold text-white flex items-center gap-1 mt-0.5">
+                      <Layers className="w-3.5 h-3.5 text-sky-400" /> {unitsPerFloor} Daire
+                    </div>
+                  </div>
+
+                  {/* Row 2, Col 2: Bitirme Süresi */}
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Bitirme Süresi</div>
+                    <div className="font-bold text-purple-300 flex items-center gap-1 mt-0.5">
+                      <CalendarCheck className="w-3.5 h-3.5 text-purple-400" />
+                      {hedefSureAy !== null ? (
+                        kalanSureAy !== null && kalanSureAy > 0
+                          ? `${hedefSureAy} Ay (${kalanSureAy} Ay Kaldı)`
+                          : isDelayed
+                          ? <span className="text-rose-400">{hedefSureAy} Ay (Süre Doldu)</span>
+                          : `${hedefSureAy} Ay`
+                      ) : (
+                        '—'
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 3, Col 1: Toplam Mülkiyet */}
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Toplam Mülkiyet</div>
+                    <div className="font-bold text-white flex items-center gap-1 mt-0.5">
+                      <Home className="w-3.5 h-3.5 text-emerald-400" /> {totalUnits} Mülkiyet
+                    </div>
+                  </div>
+
+                  {/* Row 3, Col 2: Daire Satış Fiyatı */}
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+                    <div className="text-[10px] text-slate-400 font-semibold uppercase">Daire Satış Fiyatı</div>
+                    <div className="font-bold text-emerald-400 flex items-center gap-1 mt-0.5">
+                      <Tag className="w-3.5 h-3.5 text-emerald-400" />
+                      {project.default_sale_price ? (
+                        project.default_sale_price >= 1_000_000
+                          ? `${(project.default_sale_price / 1_000_000).toFixed(1)}M ₺`
+                          : `${(project.default_sale_price / 1000).toFixed(0)}K ₺`
+                      ) : (
+                        '—'
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Select Action Button */}
               <button
                 onClick={() => onSelectProject(project)}
-                className={`w-full py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer ${
-                  isSelected
+                className={`w-full py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer ${isSelected
                     ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
                     : 'bg-slate-950 text-white border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900'
-                }`}
+                  }`}
               >
                 <span>{isSelected ? 'Şu An İnceleniyor' : 'Proje Detayına Git'}</span>
                 <ArrowRight className="w-4 h-4" />

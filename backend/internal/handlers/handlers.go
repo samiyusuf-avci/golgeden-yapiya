@@ -355,6 +355,52 @@ func (h *APIHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, project)
 }
 
+func (h *APIHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	var req struct {
+		Name                    *string                `json:"name"`
+		Location                *string                `json:"location"`
+		TotalBudget             *float64               `json:"total_budget"`
+		Visibility              *models.VisibilityType `json:"visibility"`
+		ShowFinancialsToClients *bool                  `json:"show_financials_to_clients"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	project, err := h.repo.GetProjectByID(projectID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "Project not found")
+		return
+	}
+
+	if req.Name != nil {
+		project.Name = *req.Name
+	}
+	if req.Location != nil {
+		project.Location = *req.Location
+	}
+	if req.TotalBudget != nil {
+		project.TotalBudget = *req.TotalBudget
+	}
+	if req.Visibility != nil {
+		project.Visibility = *req.Visibility
+	}
+	if req.ShowFinancialsToClients != nil {
+		project.ShowFinancialsToClients = *req.ShowFinancialsToClients
+	}
+
+	if err := h.repo.UpdateProject(projectID, project.Name, project.Location, project.TotalBudget, project.Visibility, project.ShowFinancialsToClients); err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to update project")
+		return
+	}
+
+	h.progressService.CalculateProjectMetrics(project)
+	respondJSON(w, http.StatusOK, project)
+}
+
+
 func (h *APIHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "id")
 	if projectID == "" {

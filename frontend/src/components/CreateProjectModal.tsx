@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { VisibilityType } from '../types';
-import { Building2, X, PlusCircle, Layers, Home, Shield, Lock, Eye, Globe, MapPin, ChevronDown, Check } from 'lucide-react';
+import { Building2, X, PlusCircle, Layers, Home, Shield, Lock, Eye, Globe, MapPin, ChevronDown, Check, Timer } from 'lucide-react';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ interface CreateProjectModalProps {
     units_per_floor: number;
     visibility: VisibilityType;
     show_financials_to_clients: boolean;
+    estimated_completion_months: number;
   }) => void;
 }
 
@@ -28,9 +29,11 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [unitsPerFloor, setUnitsPerFloor] = useState(2);
   const [visibility, setVisibility] = useState<VisibilityType>('public');
   const [showFinancials, setShowFinancials] = useState(false);
+  const [completionMonths, setCompletionMonths] = useState(24);
 
   const [isFloorDropdownOpen, setIsFloorDropdownOpen] = useState(false);
   const [isUnitDropdownOpen, setIsUnitDropdownOpen] = useState(false);
+  const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -59,16 +62,19 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       units_per_floor: unitsPerFloor,
       visibility,
       show_financials_to_clients: showFinancials,
+      estimated_completion_months: completionMonths,
     });
 
     setName('');
     setLocation('');
     setTotalBudget('');
+    setCompletionMonths(24);
     onClose();
   };
 
   const floorOptions = [3, 4, 5, 6, 7, 8, 9, 10];
   const unitOptions = [1, 2, 3, 4];
+  const durationOptions = [6, 9, 12, 18, 24, 30, 36, 48, 60];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-xl animate-fadeIn">
@@ -247,6 +253,53 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Tahmini Bitirme Süresi */}
+          <div className="relative">
+            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <Timer className="w-4 h-4 text-amber-400" /> Tahmini Bitirme Süresi
+            </label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDurationDropdownOpen(!isDurationDropdownOpen);
+                  setIsFloorDropdownOpen(false);
+                  setIsUnitDropdownOpen(false);
+                }}
+                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-xs font-extrabold text-white flex items-center justify-between hover:border-amber-500/50 transition shadow-inner cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Timer className="w-3.5 h-3.5 text-amber-400" />
+                  {completionMonths} Ay ({(completionMonths / 12).toFixed(completionMonths % 12 === 0 ? 0 : 1)} Yıl)
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isDurationDropdownOpen ? 'rotate-180 text-amber-400' : ''}`} />
+              </button>
+
+              {isDurationDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-950/95 border border-slate-800 rounded-2xl p-1.5 shadow-2xl z-30 space-y-1 backdrop-blur-xl animate-fadeIn max-h-56 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-slate-950/80 [&::-webkit-scrollbar-thumb]:bg-amber-500/40 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-amber-500">
+                  {durationOptions.map((months) => (
+                    <button
+                      key={months}
+                      type="button"
+                      onClick={() => {
+                        setCompletionMonths(months);
+                        setIsDurationDropdownOpen(false);
+                      }}
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                        completionMonths === months
+                          ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                      }`}
+                    >
+                      <span>{months} Ay{months % 12 === 0 ? ` (${months / 12} Yıl)` : ''}</span>
+                      {completionMonths === months && <Check className="w-3.5 h-3.5 text-slate-950" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

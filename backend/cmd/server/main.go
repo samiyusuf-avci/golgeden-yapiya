@@ -69,6 +69,7 @@ func main() {
 		r.Get("/projects", apiHandler.ListProjects)
 		r.Post("/projects", apiHandler.CreateProject)
 		r.Get("/projects/{id}", apiHandler.GetProjectByID)
+		r.Patch("/projects/{id}", apiHandler.UpdateProject)
 		r.Patch("/projects/{id}/visibility", apiHandler.UpdateVisibility)
 		r.Delete("/projects/{id}", apiHandler.DeleteProject)
 		r.Post("/projects/{id}/expenses", apiHandler.CreateExpense)

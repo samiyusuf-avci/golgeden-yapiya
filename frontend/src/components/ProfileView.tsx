@@ -68,13 +68,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 )}
               </div>
             </div>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="absolute -bottom-2 -right-2 bg-amber-500 hover:bg-amber-400 text-slate-950 p-2 rounded-2xl shadow-lg transition cursor-pointer"
-              title="Profili Düzenle"
-            >
-              <Edit3 className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Profile Basic Info */}
@@ -93,24 +86,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <Briefcase className="w-4 h-4 text-amber-400" />
                   {profile.title} • <span className="text-slate-300">{profile.company}</span>
                 </p>
-              </div>
-
-              <div className="flex items-center justify-center gap-2">
-                {isEditing ? (
-                  <button
-                    onClick={handleSave}
-                    className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 hover:from-amber-400 hover:to-yellow-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-amber-500/25 cursor-pointer"
-                  >
-                    <Save className="w-4 h-4" /> Değişiklikleri Kaydet
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md"
-                  >
-                    <Edit3 className="w-4 h-4 text-amber-400" /> Profili Düzenle
-                  </button>
-                )}
               </div>
             </div>
 
@@ -214,7 +189,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {/* Sub-Tab 1: Profile Information & Form */}
       {activeSubTab === 'info' && (
         <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
             <div>
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <User className="w-5 h-5 text-amber-400" /> Profil ve İletişim Detayları
@@ -222,6 +197,37 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <p className="text-xs text-slate-400 mt-0.5">
                 Proje paydaşları ve şantiye ekiplerinin göreceği resmi unvan ve erişim bilgileri
               </p>
+            </div>
+            <div>
+              {isEditing ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfile(initialProfile);
+                      setIsEditing(false);
+                    }}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-2xl text-xs font-bold transition cursor-pointer"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 hover:from-amber-400 hover:to-yellow-300 px-5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-amber-500/25 cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" /> Değişiklikleri Kaydet
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 cursor-pointer"
+                >
+                  <Edit3 className="w-4 h-4" /> Profili Düzenle
+                </button>
+              )}
             </div>
           </div>
 
@@ -304,6 +310,28 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               />
             </div>
           </div>
+
+          {isEditing && (
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setProfile(initialProfile);
+                  setIsEditing(false);
+                }}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-5 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer"
+              >
+                İptal
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 hover:from-amber-400 hover:to-yellow-300 px-6 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-amber-500/25 cursor-pointer"
+              >
+                <Save className="w-4 h-4" /> Değişiklikleri Kaydet
+              </button>
+            </div>
+          )}
         </div>
       )}
 

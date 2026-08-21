@@ -95,9 +95,27 @@ export function checkFloorStageStatus(
   const sortedFloors = [...project.floors].sort((a, b) => a.floor_number - b.floor_number);
   const currentFloorIdx = sortedFloors.findIndex((f) => f.id === floorId);
 
+  const totalFloors = sortedFloors.length;
+  let isTopDuplex = false;
+  try {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(`golgeden_bina_ayarlari_${project.id}`) : null;
+    if (stored) {
+      const map = JSON.parse(stored);
+      const topFloorObj = sortedFloors.find((f) => f.floor_number === totalFloors);
+      if (topFloorObj && map[topFloorObj.id]?.type === 'duplex') {
+        isTopDuplex = true;
+      }
+    }
+  } catch (e) {}
+
   if (currentFloorIdx > 0) {
     for (let i = 0; i < currentFloorIdx; i++) {
       const lowerFloor = sortedFloors[i];
+      // If targetFloor is top floor of a merged duplex (e.g. Kat 6), skip checking Kat 5 as a separate lower floor
+      if (isTopDuplex && targetFloor.floor_number === totalFloors && lowerFloor.floor_number === totalFloors - 1) {
+        continue;
+      }
+
       if (lowerFloor.stages && lowerFloor.stages.length > 0) {
         if (targetIsStructural) {
           // Structural framework stage only depends on lower floor's structural framework stage
@@ -236,12 +254,12 @@ export function checkRoofStatus(project: Project): StageDependencyStatus {
   if (project.floors && project.floors.length > 0) {
     for (const floor of project.floors) {
       if (floor.stages && floor.stages.length > 0) {
-        const incompleteStructural = floor.stages.find((s) => isStructuralStage(s) && !s.is_completed);
-        if (incompleteStructural) {
+        const incompleteStage = floor.stages.find((s) => !s.is_completed);
+        if (incompleteStage) {
           return {
             isUnlocked: false,
-            reason: `Çatı imalatı için önce ${floor.name} kolon & betonarme imalatı tamamlanmalıdır.`,
-            prerequisiteName: incompleteStructural.name,
+            reason: `Çatı imalatı için önce ${floor.name} imalatı ("${incompleteStage.name}") tamamlanmalıdır.`,
+            prerequisiteName: incompleteStage.name,
           };
         }
       }

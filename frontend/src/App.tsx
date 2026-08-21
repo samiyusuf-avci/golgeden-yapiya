@@ -11,12 +11,15 @@ import { ContractorDashboard } from './components/ContractorDashboard';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ProfileView } from './components/ProfileView';
 import { FollowingView } from './components/FollowingView';
+import { SalesView } from './components/SalesView';
+import { syncProjectFloorSettings } from './utils/floorUtils';
 import {
   Building2,
   LayoutGrid,
   ArrowLeft,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  ShoppingBag,
 } from 'lucide-react';
 
 export function App() {
@@ -28,7 +31,7 @@ export function App() {
   const [isDetailView, setIsDetailView] = useState<boolean>(() => {
     return localStorage.getItem('golgeden_is_detail_view') === 'true';
   });
-  const [detailSubTab, setDetailSubTab] = useState<'viewer' | 'stages' | 'finances' | 'settings'>(() => {
+  const [detailSubTab, setDetailSubTab] = useState<'viewer' | 'finances' | 'settings' | 'sales'>(() => {
     const saved = localStorage.getItem('golgeden_detail_sub_tab');
     return (saved as any) || 'viewer';
   });
@@ -65,7 +68,9 @@ export function App() {
   const loadProjects = async () => {
     setLoading(true);
     try {
-      const list = await ApiService.getProjects('contractor');
+      const list = (await ApiService.getProjects('contractor')).map((p) =>
+        syncProjectFloorSettings(p)
+      );
       setProjects(list);
 
       if (list.length > 1) {
@@ -141,6 +146,7 @@ export function App() {
     units_per_floor: number;
     visibility: VisibilityType;
     show_financials_to_clients: boolean;
+    estimated_completion_months: number;
   }) => {
     setLoading(true);
     try {
@@ -223,6 +229,7 @@ export function App() {
         name: data.name,
         location: data.location || 'Türkiye',
         description: `${data.floor_count} Katlı Yeni Başlanan İnşaat Projesi`,
+        estimated_completion_months: data.estimated_completion_months,
         status: 'planning',
         unit_count: data.floor_count * data.units_per_floor,
         total_budget: data.total_budget,
@@ -283,6 +290,32 @@ export function App() {
     updateActiveProjectInState(updated);
   };
 
+  const handleUpdateProjectSettings = async (settingsData: Partial<Project>) => {
+    if (!activeProject) return;
+
+    const newTotalBudget = settingsData.total_budget !== undefined ? settingsData.total_budget : activeProject.total_budget;
+    const totalActual = activeProject.total_actual_cost || 0;
+    const costVariance = newTotalBudget - totalActual;
+    const finProg = newTotalBudget > 0 ? (totalActual / newTotalBudget) * 100 : 0;
+
+    const updatedProj: Project = {
+      ...activeProject,
+      ...settingsData,
+      total_budget: newTotalBudget,
+      cost_variance: costVariance,
+      financial_progress: Math.round(finProg * 10) / 10,
+      last_update_date: new Date().toISOString().split('T')[0],
+    };
+
+    updateActiveProjectInState(updatedProj);
+
+    try {
+      await ApiService.updateProjectSettings(activeProject.id, settingsData, 'contractor');
+    } catch (err) {
+      console.warn('Backend update failed:', err);
+    }
+  };
+
   const handleAddExpense = async (expenseData: Partial<Expense>) => {
     if (!activeProject) return;
     const newExp = await ApiService.createExpense(activeProject.id, expenseData);
@@ -306,11 +339,33 @@ export function App() {
     if (!activeProject || !activeProject.floors) return;
     ApiService.updateStage(stageId, isCompleted);
 
+    const totalFloors = activeProject.floors.length;
+    const targetFloor = activeProject.floors.find((f) => f.id === floorId);
+
+    let isTopDuplex = false;
+    try {
+      const stored = localStorage.getItem(`golgeden_bina_ayarlari_${activeProject.id}`);
+      if (stored) {
+        const map = JSON.parse(stored);
+        if (targetFloor && targetFloor.floor_number === totalFloors && map[targetFloor.id]?.type === 'duplex') {
+          isTopDuplex = true;
+        }
+      }
+    } catch (e) {}
+
+    const mergedFloorNumber = isTopDuplex && targetFloor ? targetFloor.floor_number - 1 : null;
+    const mergedFloor = mergedFloorNumber ? activeProject.floors.find((f) => f.floor_number === mergedFloorNumber) : null;
+
     const newFloors = activeProject.floors.map((f) => {
       if (f.id === floorId && f.stages) {
         const updatedStages = f.stages.map((st) =>
           st.id === stageId ? { ...st, is_completed: isCompleted } : st
         );
+        const allDone = updatedStages.every((st) => st.is_completed);
+        return { ...f, stages: updatedStages, is_completed: allDone };
+      }
+      if (mergedFloor && f.id === mergedFloor.id && f.stages) {
+        const updatedStages = f.stages.map((st) => ({ ...st, is_completed: isCompleted }));
         const allDone = updatedStages.every((st) => st.is_completed);
         return { ...f, stages: updatedStages, is_completed: allDone };
       }
@@ -519,11 +574,24 @@ export function App() {
                         </button>
 
                         {activeProject && (
-                          <div className="hidden md:block">
-                            <h3 className="text-base font-bold text-white leading-tight">
+                          <div className="hidden md:flex flex-col justify-center border-l border-slate-700/60 pl-4 ml-1">
+                            <h3
+                              className="text-sm font-extrabold leading-tight tracking-wide"
+                              style={{
+                                background: 'linear-gradient(90deg, #f59e0b, #fbbf24, #fde68a)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                              }}
+                            >
                               {activeProject.name}
                             </h3>
-                            <p className="text-[11px] text-slate-400">{activeProject.location}</p>
+                            <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5 font-medium tracking-wider uppercase">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-amber-500/70" viewBox="0 0 24 24" fill="currentColor">
+                                <path fillRule="evenodd" d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-2.003 3.5-4.697 3.5-8.327a8.25 8.25 0 00-16.5 0c0 3.63 1.556 6.324 3.5 8.327a19.58 19.58 0 002.683 2.282 16.975 16.975 0 001.144.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                              </svg>
+                              {activeProject.location}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -540,16 +608,7 @@ export function App() {
                         >
                           3D Görselleştirici
                         </button>
-                        <button
-                          onClick={() => setDetailSubTab('stages')}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                            detailSubTab === 'stages'
-                              ? 'bg-amber-500 text-slate-950 shadow-md'
-                              : 'text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          Aşama & İmalat
-                        </button>
+
                         <button
                           onClick={() => setDetailSubTab('finances')}
                           className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
@@ -558,7 +617,18 @@ export function App() {
                               : 'text-slate-400 hover:text-white'
                           }`}
                         >
-                          Finans & Gider
+                          Finans &amp; Gider
+                        </button>
+                        <button
+                          onClick={() => setDetailSubTab('sales')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                            detailSubTab === 'sales'
+                              ? 'bg-amber-500 text-slate-950 shadow-md'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          Satış
                         </button>
                         <button
                           onClick={() => setDetailSubTab('settings')}
@@ -582,21 +652,19 @@ export function App() {
                           floors={activeProject.floors || []}
                           onToggleFloorStage={handleToggleFloorStage}
                           onToggleUnitStage={handleToggleUnitStage}
+                          onUpdateProject={updateActiveProjectInState}
                           isContractor={true}
                         />
+                        <ContractorDashboard
+                          project={activeProject}
+                          onUpdateVisibility={handleUpdateVisibility}
+                          onAddExpense={handleAddExpense}
+                          onToggleStage={handleToggleProjectStage}
+                          onCreateNewProject={handleCreateNewProject}
+                          onDeleteProject={handleDeleteProject}
+                          initialTab="stages"
+                        />
                       </div>
-                    )}
-
-                    {activeProject && detailSubTab === 'stages' && (
-                      <ContractorDashboard
-                        project={activeProject}
-                        onUpdateVisibility={handleUpdateVisibility}
-                        onAddExpense={handleAddExpense}
-                        onToggleStage={handleToggleProjectStage}
-                        onCreateNewProject={handleCreateNewProject}
-                        onDeleteProject={handleDeleteProject}
-                        initialTab="stages"
-                      />
                     )}
 
                     {activeProject && detailSubTab === 'finances' && (
@@ -618,11 +686,19 @@ export function App() {
                       <ContractorDashboard
                         project={activeProject}
                         onUpdateVisibility={handleUpdateVisibility}
+                        onUpdateProjectSettings={handleUpdateProjectSettings}
                         onAddExpense={handleAddExpense}
                         onToggleStage={handleToggleProjectStage}
                         onCreateNewProject={handleCreateNewProject}
                         onDeleteProject={handleDeleteProject}
                         initialTab="settings"
+                      />
+                    )}
+
+                    {activeProject && detailSubTab === 'sales' && (
+                      <SalesView
+                        project={activeProject}
+                        onUpdateProject={updateActiveProjectInState}
                       />
                     )}
                   </div>

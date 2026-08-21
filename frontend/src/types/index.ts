@@ -57,6 +57,8 @@ export interface Unit {
   owner_id?: string;
   is_completed: boolean;
   stages?: Stage[];
+  sale_price?: number;
+  is_sold?: boolean;
 }
 
 export interface BuildingFloor {
@@ -102,6 +104,7 @@ export interface Project {
   show_financials_to_clients: boolean;
   created_at?: string;
   description?: string;
+  estimated_completion_months?: number;
   status?: 'active' | 'planning' | 'completed';
   unit_count?: number;
   is_following?: boolean;
@@ -114,6 +117,10 @@ export interface Project {
   total_actual_cost: number;
   cost_variance: number;
   
+  // Sales
+  sales_enabled?: boolean;
+  default_sale_price?: number;
+
   floors?: BuildingFloor[];
   expenses?: Expense[];
   stages?: Stage[];

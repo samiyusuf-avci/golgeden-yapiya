@@ -164,6 +164,70 @@ export class ApiService {
     }
   }
 
+  static async updateProjectSettings(
+    projectID: string,
+    settingsData: Partial<Project>,
+    activeRole: UserRole
+  ): Promise<Project> {
+    const updateLocalStored = (pID: string, updates: Partial<Project>) => {
+      const stored = this.getStoredProjects();
+      if (stored) {
+        const updated = stored.map((p) => {
+          if (p.id === pID) {
+            const newTotalBudget =
+              updates.total_budget !== undefined ? updates.total_budget : p.total_budget;
+            const totalActual = p.total_actual_cost || 0;
+            const costVariance = newTotalBudget - totalActual;
+            const finProg = newTotalBudget > 0 ? (totalActual / newTotalBudget) * 100 : 0;
+            return {
+              ...p,
+              ...updates,
+              total_budget: newTotalBudget,
+              cost_variance: costVariance,
+              financial_progress: Math.round(finProg * 10) / 10,
+              last_update_date: new Date().toISOString().split('T')[0],
+            };
+          }
+          return p;
+        });
+        this.saveProjectsToStorage(updated);
+      }
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/projects/${projectID}`, {
+        method: 'PATCH',
+        headers: this.getHeaders(activeRole),
+        body: JSON.stringify(settingsData),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        updateLocalStored(projectID, settingsData);
+        return data;
+      }
+    } catch (err) {
+      console.warn('Backend update failed, updating local mock project', err);
+    }
+
+    const proj = await this.getProject(projectID, activeRole);
+    const newTotalBudget =
+      settingsData.total_budget !== undefined ? settingsData.total_budget : proj.total_budget;
+    const totalActual = proj.total_actual_cost || 0;
+    const costVariance = newTotalBudget - totalActual;
+    const finProg = newTotalBudget > 0 ? (totalActual / newTotalBudget) * 100 : 0;
+
+    const updatedProj: Project = {
+      ...proj,
+      ...settingsData,
+      total_budget: newTotalBudget,
+      cost_variance: costVariance,
+      financial_progress: Math.round(finProg * 10) / 10,
+      last_update_date: new Date().toISOString().split('T')[0],
+    };
+    updateLocalStored(projectID, settingsData);
+    return updatedProj;
+  }
+
   static async deleteProject(projectID: string): Promise<void> {
     try {
       await fetch(`${API_BASE}/projects/${projectID}`, {

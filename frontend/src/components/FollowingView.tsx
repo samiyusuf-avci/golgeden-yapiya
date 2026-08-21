@@ -11,7 +11,9 @@ import {
   Activity,
   Layers,
   Building2,
-  Home
+  Home,
+  TrendingUp,
+  CalendarCheck
 } from 'lucide-react';
 
 export const getProjectFloorsCount = (project: Project): number => {
@@ -218,6 +220,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
 
                     {/* Key Construction Stats Grid */}
                     <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-800/80 text-xs">
+                      {/* Row 1, Col 1 */}
                       <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                         <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Sayısı</div>
                         <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
@@ -225,6 +228,15 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                         </div>
                       </div>
 
+                      {/* Row 1, Col 2 */}
+                      <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Müteahhit Firma</div>
+                        <div className="text-xs font-bold text-slate-200 truncate mt-0.5">
+                          {project.contractor_name || '—'}
+                        </div>
+                      </div>
+
+                      {/* Row 2, Col 1 */}
                       <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                         <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Başı Daire</div>
                         <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
@@ -232,17 +244,35 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                         </div>
                       </div>
 
+                      {/* Row 2, Col 2 */}
                       <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
-                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Toplam Daire</div>
-                        <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
-                          <Home className="w-3.5 h-3.5 text-emerald-400" /> {totalUnits} Daire
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Daire Fiyatı</div>
+                        <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                          <TrendingUp className="w-3.5 h-3.5" />
+                          {project.default_sale_price
+                            ? project.default_sale_price >= 1_000_000
+                              ? `${(project.default_sale_price / 1_000_000).toFixed(1)}M ₺`
+                              : `${(project.default_sale_price / 1000).toFixed(0)}K ₺`
+                            : '—'}
                         </div>
                       </div>
 
+                      {/* Row 3, Col 1 */}
                       <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
-                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Müteahhit Firma</div>
-                        <div className="text-xs font-bold text-slate-200 truncate mt-0.5">
-                          {project.contractor_name || 'Avcı Yapı A.Ş.'}
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Toplam Mülkiyet</div>
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
+                          <Home className="w-3.5 h-3.5 text-emerald-400" /> {totalUnits} Mülkiyet
+                        </div>
+                      </div>
+
+                      {/* Row 3, Col 2 */}
+                      <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Bitirme Süresi</div>
+                        <div className="text-xs font-bold text-sky-300 flex items-center gap-1.5 mt-0.5">
+                          <CalendarCheck className="w-3.5 h-3.5" />
+                          {project.estimated_completion_months
+                            ? `${project.estimated_completion_months} Ay`
+                            : '—'}
                         </div>
                       </div>
                     </div>
@@ -317,6 +347,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
 
                   {/* Construction Details Grid */}
                   <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+                    {/* Row 1, Col 1 */}
                     <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                       <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Sayısı</div>
                       <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
@@ -324,6 +355,15 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                       </div>
                     </div>
 
+                    {/* Row 1, Col 2 */}
+                    <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Müteahhit Firma</div>
+                      <div className="text-xs font-bold text-slate-200 truncate mt-0.5">
+                        {project.contractor_name || '—'}
+                      </div>
+                    </div>
+
+                    {/* Row 2, Col 1 */}
                     <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                       <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Başı Daire</div>
                       <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
@@ -331,17 +371,35 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                       </div>
                     </div>
 
+                    {/* Row 2, Col 2 */}
                     <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
-                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Toplam Daire</div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
-                        <Home className="w-3.5 h-3.5 text-emerald-400" /> {totalUnits} Daire
+                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Daire Fiyatı</div>
+                      <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        {project.default_sale_price
+                          ? project.default_sale_price >= 1_000_000
+                            ? `${(project.default_sale_price / 1_000_000).toFixed(1)}M ₺`
+                            : `${(project.default_sale_price / 1000).toFixed(0)}K ₺`
+                          : '—'}
                       </div>
                     </div>
 
+                    {/* Row 3, Col 1 */}
                     <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
-                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Müteahhit Firma</div>
-                      <div className="text-xs font-bold text-slate-200 truncate mt-0.5">
-                        {project.contractor_name || 'Avcı Yapı A.Ş.'}
+                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Toplam Mülkiyet</div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
+                        <Home className="w-3.5 h-3.5 text-emerald-400" /> {totalUnits} Mülkiyet
+                      </div>
+                    </div>
+
+                    {/* Row 3, Col 2 */}
+                    <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Bitirme Süresi</div>
+                      <div className="text-xs font-bold text-sky-300 flex items-center gap-1.5 mt-0.5">
+                        <CalendarCheck className="w-3.5 h-3.5" />
+                        {project.estimated_completion_months
+                          ? `${project.estimated_completion_months} Ay`
+                          : '—'}
                       </div>
                     </div>
                   </div>

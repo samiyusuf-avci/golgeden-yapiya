@@ -18,9 +18,14 @@ import {
   Wrench,
   Trash2,
   AlertTriangle,
+  Building2,
+  MapPin,
+  Sliders,
+  ShoppingBag,
 } from 'lucide-react';
 import { CreateProjectModal } from './CreateProjectModal';
 import { CustomCategorySelect } from './CustomCategorySelect';
+import { CustomDurationSelect } from './CustomDurationSelect';
 import { CustomDatePicker } from './CustomDatePicker';
 import { DeleteProjectModal } from './DeleteProjectModal';
 import { checkProjectStageStatus } from '../utils/stageDependencies';
@@ -76,6 +81,7 @@ const formatDateTr = (dateStr: string) => {
 interface ContractorDashboardProps {
   project: Project;
   onUpdateVisibility: (visibility: VisibilityType, showFinancials: boolean) => void;
+  onUpdateProjectSettings?: (settingsData: Partial<Project>) => void;
   onAddExpense: (expense: Partial<Expense>) => void;
   onToggleStage: (stageId: string, isCompleted: boolean) => void;
   onCreateNewProject: (projectData: any) => void;
@@ -86,6 +92,7 @@ interface ContractorDashboardProps {
 export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
   project,
   onUpdateVisibility,
+  onUpdateProjectSettings,
   onAddExpense,
   onToggleStage,
   onCreateNewProject,
@@ -111,21 +118,57 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
   );
 
   // Settings State
+  const [name, setName] = useState<string>(project.name || '');
+  const [location, setLocation] = useState<string>(project.location || '');
+  const [description, setDescription] = useState<string>(project.description || '');
+  const [totalBudget, setTotalBudget] = useState<string>(
+    project.total_budget ? project.total_budget.toLocaleString('tr-TR') : ''
+  );
+  const [status, setStatus] = useState<'active' | 'planning' | 'completed'>(
+    project.status || 'planning'
+  );
+  const [completionMonths, setCompletionMonths] = useState<number>(
+    project.estimated_completion_months || 24
+  );
   const [visibility, setVisibility] = useState<VisibilityType>(project.visibility || 'public');
   const [showFinancials, setShowFinancials] = useState<boolean>(
     project.show_financials_to_clients || false
   );
+  const [defaultSalePrice, setDefaultSalePrice] = useState<string>(
+    project.default_sale_price ? project.default_sale_price.toLocaleString('tr-TR') : ''
+  );
+  const [salesEnabled, setSalesEnabled] = useState<boolean>(
+    project.sales_enabled ?? true
+  );
   const [settingsSuccessMessage, setSettingsSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    setName(project.name || '');
+    setLocation(project.location || '');
+    setDescription(project.description || '');
+    setTotalBudget(project.total_budget ? project.total_budget.toLocaleString('tr-TR') : '');
+    setStatus(project.status || 'planning');
+    setCompletionMonths(project.estimated_completion_months || 24);
     setVisibility(project.visibility || 'public');
     setShowFinancials(project.show_financials_to_clients || false);
-  }, [project.id, project.visibility, project.show_financials_to_clients]);
+    setDefaultSalePrice(project.default_sale_price ? project.default_sale_price.toLocaleString('tr-TR') : '');
+    setSalesEnabled(project.sales_enabled ?? true);
+  }, [project]);
 
-  const initialVisibility = project.visibility || 'public';
-  const initialShowFinancials = project.show_financials_to_clients || false;
+  const parsedBudget = parseFloat(totalBudget.replace(/\./g, '')) || 0;
+  const parsedSalePrice = parseFloat(defaultSalePrice.replace(/\./g, '')) || 0;
+
   const hasSettingsChanged =
-    visibility !== initialVisibility || showFinancials !== initialShowFinancials;
+    name.trim() !== (project.name || '') ||
+    location.trim() !== (project.location || '') ||
+    description.trim() !== (project.description || '') ||
+    parsedBudget !== (project.total_budget || 0) ||
+    status !== (project.status || 'planning') ||
+    completionMonths !== (project.estimated_completion_months || 24) ||
+    visibility !== (project.visibility || 'public') ||
+    showFinancials !== (project.show_financials_to_clients || false) ||
+    parsedSalePrice !== (project.default_sale_price || 0) ||
+    salesEnabled !== (project.sales_enabled ?? true);
 
   const formatNumberWithDots = (val: string): string => {
     const rawDigits = val.replace(/\D/g, '');
@@ -154,8 +197,27 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
 
   const handleSaveSettings = () => {
     if (!hasSettingsChanged) return;
-    onUpdateVisibility(visibility, showFinancials);
-    setSettingsSuccessMessage('Gizlilik ve görünürlük ayarları başarıyla kaydedildi ve uygulandı.');
+
+    const updatedData: Partial<Project> = {
+      name: name.trim() || project.name,
+      location: location.trim(),
+      description: description.trim(),
+      total_budget: parsedBudget,
+      status,
+      estimated_completion_months: completionMonths,
+      visibility,
+      show_financials_to_clients: showFinancials,
+      default_sale_price: parsedSalePrice,
+      sales_enabled: salesEnabled,
+    };
+
+    if (onUpdateProjectSettings) {
+      onUpdateProjectSettings(updatedData);
+    } else {
+      onUpdateVisibility(visibility, showFinancials);
+    }
+
+    setSettingsSuccessMessage('Proje ayarları başarıyla kaydedildi ve tüm sisteme uygulandı.');
     setTimeout(() => {
       setSettingsSuccessMessage(null);
     }, 4000);
@@ -432,14 +494,36 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
         </div>
       )}
 
-      {/* Tab 3: Project Privacy Settings */}
+      {/* Tab 3: Project Settings & Configuration Panel */}
       {activeTab === 'settings' && (
-        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 max-w-2xl mx-auto space-y-6">
+        <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 sm:p-8 max-w-3xl mx-auto space-y-8">
+          {/* Header Banner */}
+          <div className="flex items-center justify-between border-b border-slate-800 pb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Sliders className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-xl font-extrabold text-white">Proje Ayarları & Yapılandırma</h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Projenizin adı, bütçesi, şantiye statüsü, görünürlüğü ve satış tercihlerini düzenleyin.
+                </p>
+              </div>
+            </div>
+            {hasSettingsChanged && (
+              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                Kaydedilmemiş Değişiklik Var
+              </span>
+            )}
+          </div>
+
+          {/* Toast Message */}
           {settingsSuccessMessage && (
-            <div className="p-3.5 bg-emerald-500/20 border border-emerald-500/40 rounded-xl flex items-center justify-between text-emerald-200 text-xs animate-fadeIn shadow-lg shadow-emerald-500/10">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>{settingsSuccessMessage}</span>
+            <div className="p-4 bg-emerald-500/20 border border-emerald-500/40 rounded-2xl flex items-center justify-between text-emerald-200 text-xs animate-fadeIn shadow-lg shadow-emerald-500/10">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <span className="font-semibold">{settingsSuccessMessage}</span>
               </div>
               <button
                 type="button"
@@ -451,93 +535,275 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
             </div>
           )}
 
-          <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-            <Shield className="w-6 h-6 text-amber-500" />
+          {/* Section 1: Temel Proje Bilgileri */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-amber-400 uppercase tracking-wider">
+              <Building2 className="w-4 h-4" />
+              <span>1. Temel Proje Künyesi & Statü</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Proje Adı */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                  Proje Adı <span className="text-amber-400">*</span>
+                </label>
+                <div className="relative">
+                  <Building2 className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Örn: Zümrüt Kule Rezidans"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Lokasyon / Adres */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                  Lokasyon / Şehir
+                </label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="Örn: Ataşehir, İstanbul"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Proje Durumu / Statü */}
             <div>
-              <h4 className="text-base font-bold text-white">Görünürlük & Finansal Gizlilik Ayarları</h4>
-              <p className="text-xs text-slate-400">
-                Müşteri portalında görünmesini istediğiniz yetki ve bütçe sınırlarını yönetin.
-              </p>
+              <label className="block text-xs font-semibold text-slate-400 mb-2">
+                Proje İnşaat Statüsü
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { id: 'planning', label: 'Planlama Aşamasında', icon: '📝' },
+                  { id: 'active', label: 'İnşaat Halinde (Devam Ediyor)', icon: '🏗️' },
+                  { id: 'completed', label: 'Tamamlandı & Teslim', icon: '✅' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setStatus(item.id as any)}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition cursor-pointer ${
+                      status === item.id
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="text-base">{item.icon}</span>
+                    <span className="text-center">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tahmini Süre & Açıklama */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                  Tahmini Süre (Ay)
+                </label>
+                <CustomDurationSelect
+                  value={completionMonths}
+                  onChange={(val) => setCompletionMonths(val)}
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                  Proje Açıklaması & Notlar
+                </label>
+                <div className="relative">
+                  <FileText className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+                  <textarea
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Proje hakkında kısa açıklama veya inşaat detayları..."
+                    className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition resize-none"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Visibility Mode Radio Group */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Proje Görünürlük Statüsü
-            </label>
+          <hr className="border-slate-800/80" />
+
+          {/* Section 2: Finans & Bütçe Yönetimi */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-amber-400 uppercase tracking-wider">
+              <Wallet className="w-4 h-4" />
+              <span>2. Finans & Bütçe Yönetimi</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                Proje Toplam Hedef Bütçesi (₺) <span className="text-amber-400">*</span>
+              </label>
+              <div className="relative">
+                <span className="text-slate-500 font-bold absolute left-3.5 top-1/2 -translate-y-1/2 text-sm">₺</span>
+                <input
+                  type="text"
+                  value={totalBudget}
+                  onChange={(e) => setTotalBudget(formatNumberWithDots(e.target.value))}
+                  placeholder="50.000.000"
+                  className="w-full pl-8 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-bold text-amber-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                💡 Bütçeyi güncellediğinizde harcama sapması ve % finansal ilerleme oranları tüm platformda anında yeniden hesaplanır.
+              </p>
+            </div>
+
+            {/* Müşteri Finans Privacy Switch */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="text-sm font-bold text-white flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-amber-400" />
+                  <span>Müşterilere Finansal Verileri Göster</span>
+                </div>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  Kapalıyken müşteriler Bütçe, Harcama ve Gider detaylarını göremez.
+                </p>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showFinancials}
+                  onChange={(e) => setShowFinancials(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500" />
+              </label>
+            </div>
+          </div>
+
+          <hr className="border-slate-800/80" />
+
+          {/* Section 3: Görünürlük & Erişim Statüsü */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-amber-400 uppercase tracking-wider">
+              <Shield className="w-4 h-4" />
+              <span>3. Görünürlük & Erişim Yetkileri</span>
+            </div>
+
             <div className="grid grid-cols-3 gap-3">
               {[
-                { type: 'private', label: 'Özel (Private)', icon: Lock },
-                { type: 'protected', label: 'Davetli (Protected)', icon: Eye },
-                { type: 'public', label: 'Herkese Açık (Public)', icon: Globe },
-              ].map(({ type, label, icon: Icon }) => (
+                { type: 'private', label: 'Özel (Private)', desc: 'Yalnızca siz görürsünüz', icon: Lock },
+                { type: 'protected', label: 'Davetli (Protected)', desc: 'Davetli müşteriler erişir', icon: Eye },
+                { type: 'public', label: 'Herkese Açık (Public)', desc: 'Tüm platforma açık', icon: Globe },
+              ].map(({ type, label, desc, icon: Icon }) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => setVisibility(type as VisibilityType)}
-                  className={`p-3 rounded-xl border flex flex-col items-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+                  className={`p-3.5 rounded-2xl border flex flex-col items-center text-center gap-2 text-xs font-bold transition-all cursor-pointer ${
                     visibility === type
-                      ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md'
+                      ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md ring-1 ring-amber-400/30'
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
                   }`}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span>{label}</span>
+                  <Icon className="w-5 h-5 text-amber-400" />
+                  <div>
+                    <div className="font-extrabold text-white text-xs">{label}</div>
+                    <div className="text-[10px] text-slate-500 font-normal mt-0.5">{desc}</div>
+                  </div>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Client Financial Privacy Switch */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <div className="text-sm font-bold text-white flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-amber-400" />
-                <span>Müşterilere Finansal Verileri Göster</span>
-              </div>
-              <p className="text-xs text-slate-400 max-w-sm">
-                Kapalı olduğunda `client` rolündeki kullanıcıların ekranında Bütçe, Harcama ve Gider grafikleri otomatik maskelenir.
-              </p>
+          <hr className="border-slate-800/80" />
+
+          {/* Section 4: Satış & Daire Fiyatlandırma Ayarları */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-amber-400 uppercase tracking-wider">
+              <ShoppingBag className="w-4 h-4" />
+              <span>4. Satış & Dağıtım Yapılandırması</span>
             </div>
 
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showFinancials}
-                onChange={(e) => setShowFinancials(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500" />
-            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Sales Enabled Toggle */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="text-xs font-bold text-white flex items-center gap-2">
+                    <ShoppingBag className="w-4 h-4 text-amber-400" />
+                    <span>Satış Modülünü Etkinleştir</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Proje içerisindeki Satış sekmesini aktifleştirir.
+                  </p>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={salesEnabled}
+                    onChange={(e) => setSalesEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500" />
+                </label>
+              </div>
+
+              {/* Default Sale Price */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                  Varsayılan Daire Satış Fiyatı (₺)
+                </label>
+                <div className="relative">
+                  <span className="text-slate-500 font-bold absolute left-3.5 top-1/2 -translate-y-1/2 text-sm">₺</span>
+                  <input
+                    type="text"
+                    value={defaultSalePrice}
+                    onChange={(e) => setDefaultSalePrice(formatNumberWithDots(e.target.value))}
+                    placeholder="3.500.000"
+                    className="w-full pl-8 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <button
-            type="button"
-            disabled={!hasSettingsChanged}
-            onClick={handleSaveSettings}
-            className={`w-full py-3.5 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              hasSettingsChanged
-                ? 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/25 cursor-pointer ring-2 ring-amber-400/50 font-extrabold'
-                : 'bg-slate-800/60 border border-slate-700/80 text-slate-500 cursor-not-allowed opacity-60'
-            }`}
-          >
-            <Save className={`w-4 h-4 ${hasSettingsChanged ? 'text-slate-950' : 'text-slate-500'}`} />
-            <span>
-              {hasSettingsChanged
-                ? 'Gizlilik Ayarlarını Kaydet ve Uygula'
-                : 'Değişiklik Yok (Ayarlar Güncel)'}
-            </span>
-          </button>
+          {/* Section 5: Save Settings Button */}
+          <div className="pt-2">
+            <button
+              type="button"
+              disabled={!hasSettingsChanged}
+              onClick={handleSaveSettings}
+              className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm transition-all flex items-center justify-center gap-2.5 ${
+                hasSettingsChanged
+                  ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 shadow-xl shadow-amber-500/20 cursor-pointer ring-2 ring-amber-400/50 scale-[1.01]'
+                  : 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+              }`}
+            >
+              <Save className={`w-5 h-5 ${hasSettingsChanged ? 'text-slate-950 animate-bounce' : 'text-slate-500'}`} />
+              <span>
+                {hasSettingsChanged
+                  ? 'Proje Ayarlarını Kaydet ve Tüm Sisteme Uygula'
+                  : 'Değişiklik Yok (Tüm Ayarlar Güncel)'}
+              </span>
+            </button>
+          </div>
 
-          {/* Danger Zone: Delete Project */}
-          <div className="bg-red-950/30 border border-red-500/30 rounded-2xl p-5 space-y-3 mt-8">
+          {/* Section 6: Danger Zone: Delete Project */}
+          <div className="bg-red-950/20 border border-red-500/30 rounded-2xl p-5 space-y-3 mt-8">
             <div className="flex items-center gap-2.5 text-red-400 font-extrabold text-sm">
               <Trash2 className="w-5 h-5 text-red-500" />
               <span>Tehlikeli Bölge: Projeyi Sil</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Bu projeyi sistemden tamamen kaldırır. Projeye ait tüm katlar, daireler, imalat aşamaları ve harcama kayıtları kalıcı olarak silinir.
+              Bu projeyi platformdan tamamen kaldırır. Projeye ait tüm katlar, daireler, imalat aşamaları ve harcama kayıtları kalıcı olarak silinir.
             </p>
             <button
               type="button"

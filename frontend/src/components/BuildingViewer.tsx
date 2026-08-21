@@ -1,13 +1,407 @@
-import React, { useState } from 'react';
-import type { BuildingFloor, Project } from '../types';
-import { Building2, CheckCircle2, CircleDashed, Sparkles, Layers, Eye, Home, ChevronRight, Lock, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import type { BuildingFloor, Project, Unit } from '../types';
+import {
+  Building2,
+  CheckCircle2,
+  Sparkles,
+  Layers,
+  Eye,
+  Home,
+  ChevronRight,
+  Lock,
+  AlertTriangle,
+  SlidersHorizontal,
+  Store,
+  Briefcase,
+  Check,
+  RefreshCw,
+  Info,
+  ChevronDown,
+  ArrowDownUp,
+} from 'lucide-react';
 import { checkFloorStageStatus, checkUnitStageStatus, checkRoofStatus } from '../utils/stageDependencies';
+import { getEffectiveFloorUnits as getEffectiveFloorUnitsFromUtil } from '../utils/floorUtils';
+
+export type FloorTypology =
+  | 'residential'
+  | 'commercial_shop'
+  | 'business_office'
+  | 'duplex'
+  | 'reverse_duplex'
+  | 'parking_storage'
+  | 'duplex_bottom';
+
+export interface FloorTypologyConfig {
+  type: FloorTypology;
+  unitCount?: number;
+  customName?: string;
+}
+
+export const FLOOR_TYPOLOGY_MAP: Record<
+  FloorTypology,
+  {
+    label: string;
+    shortBadge: string;
+    unitPrefix: string;
+    icon: React.ElementType;
+    badgeStyle: string;
+    cardBorder: string;
+    accentColor: string;
+    bgGradient: string;
+    barColor: string;
+    desc: string;
+  }
+> = {
+  commercial_shop: {
+    label: 'Dükkan & Cadde Mağazası',
+    shortBadge: '🏪 DÜKKAN',
+    unitPrefix: 'Dükkan',
+    icon: Store,
+    badgeStyle: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    cardBorder: 'border-emerald-500/80',
+    accentColor: 'text-emerald-400',
+    bgGradient: 'from-emerald-950/90 via-emerald-900/50 to-slate-900',
+    barColor: 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]',
+    desc: 'Cadde cepheli dükkan, ticari alan ve mağaza',
+  },
+  business_office: {
+    label: 'Ofis Katı / İş Merkezi',
+    shortBadge: '🏢 OFİS',
+    unitPrefix: 'Ofis',
+    icon: Briefcase,
+    badgeStyle: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+    cardBorder: 'border-blue-500/80',
+    accentColor: 'text-blue-400',
+    bgGradient: 'from-blue-950/90 via-blue-900/50 to-slate-900',
+    barColor: 'bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]',
+    desc: 'Kurumsal plaza ofisi veya büro çalışma katı',
+  },
+  residential: {
+    label: 'Konut Daire Katı',
+    shortBadge: '🏠 DARE',
+    unitPrefix: 'Daire',
+    icon: Home,
+    badgeStyle: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    cardBorder: 'border-amber-500/80',
+    accentColor: 'text-amber-400',
+    bgGradient: 'from-amber-950/90 via-amber-900/50 to-slate-900',
+    barColor: 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.8)]',
+    desc: 'Standart konut dairelerinden oluşan yaşam katı',
+  },
+  reverse_duplex: {
+    label: 'Ters Dubleks Daire Katı',
+    shortBadge: '🔄 TERS DUBLEKS',
+    unitPrefix: 'Ters Dubleks',
+    icon: ArrowDownUp,
+    badgeStyle: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
+    cardBorder: 'border-teal-500/80',
+    accentColor: 'text-teal-400',
+    bgGradient: 'from-teal-950/90 via-teal-900/50 to-slate-900',
+    barColor: 'bg-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.8)]',
+    desc: 'Zemin/bahçe seviyeli alt kata inen ters dubleks daire',
+  },
+  duplex: {
+    label: 'Çatı Dubleks Penthouse Katı',
+    shortBadge: '🏰 DUBLEKS',
+    unitPrefix: 'Dubleks',
+    icon: ArrowDownUp,
+    badgeStyle: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+    cardBorder: 'border-purple-500/80',
+    accentColor: 'text-purple-400',
+    bgGradient: 'from-purple-950/90 via-purple-900/50 to-slate-900',
+    barColor: 'bg-purple-500 shadow-[0_0_12px_rgba(168,85,247,0.8)]',
+    desc: 'En üst kat çift katlı dubleks daire veya penthouse',
+  },
+  duplex_bottom: {
+    label: 'Dubleks Alt Katı (Üst Kat ile Birleşik)',
+    shortBadge: '🔗 DUBLEKS (ALT)',
+    unitPrefix: 'Dubleks (Alt)',
+    icon: ArrowDownUp,
+    badgeStyle: 'bg-purple-900/50 text-purple-200 border-purple-400/60',
+    cardBorder: 'border-purple-500/80',
+    accentColor: 'text-purple-300',
+    bgGradient: 'from-purple-950/80 via-purple-900/40 to-slate-900',
+    barColor: 'bg-purple-500 shadow-[0_0_12px_rgba(168,85,247,0.8)]',
+    desc: 'En üst kat dubleks dairelerin alt yaşam katı (Birleştirilmiş)',
+  },
+  parking_storage: {
+    label: 'Otopark / Servis & Depo',
+    shortBadge: '🅿️ OTOPARK/DEPO',
+    unitPrefix: 'Servis',
+    icon: Layers,
+    badgeStyle: 'bg-slate-700/40 text-slate-300 border-slate-600',
+    cardBorder: 'border-slate-700',
+    accentColor: 'text-slate-400',
+    bgGradient: 'from-slate-950 via-slate-900 to-slate-950',
+    barColor: 'bg-slate-500 shadow-[0_0_12px_rgba(100,116,139,0.8)]',
+    desc: 'Kapalı otopark, sığınak, depo veya ortak hizmet alanı',
+  },
+};
+
+
+
+// Top floor duplex merging helper
+export const isFloorMergedWithTopDuplex = (
+  floorNumber: number,
+  totalFloors: number,
+  floors: BuildingFloor[],
+  typologies: Record<string, FloorTypologyConfig>
+): { isMerged: boolean; topFloorNumber?: number; topUnitCount?: number } => {
+  if (!floors || totalFloors < 2) return { isMerged: false };
+  if (floorNumber !== totalFloors - 1) return { isMerged: false };
+
+  const topFloor = floors.find((f) => f.floor_number === totalFloors);
+  if (!topFloor) return { isMerged: false };
+
+  const topTypo = typologies[topFloor.id]?.type;
+  if (topTypo === 'duplex') {
+    const topUnitCount = typologies[topFloor.id]?.unitCount ?? (topFloor.units?.length || 3);
+    return { isMerged: true, topFloorNumber: totalFloors, topUnitCount };
+  }
+
+  return { isMerged: false };
+};
+
+// Floor Position Rule Engine:
+// En alt kat: dükkan, ofis, daire, ters dublex
+// Ara katlar: dükkan, ofis, daire
+// En üst kat: dükkan, ofis, daire, dublex
+export const getAvailableTypologiesForFloor = (floorNumber: number, totalFloors: number): FloorTypology[] => {
+  if (totalFloors <= 1) {
+    return ['commercial_shop', 'business_office', 'residential', 'reverse_duplex', 'duplex'];
+  }
+  if (floorNumber === 1) {
+    return ['commercial_shop', 'business_office', 'residential', 'reverse_duplex'];
+  }
+  if (floorNumber === totalFloors) {
+    return ['commercial_shop', 'business_office', 'residential', 'duplex'];
+  }
+  return ['commercial_shop', 'business_office', 'residential'];
+};
+
+// =========================================================================
+// CUSTOM BEAUTIFIED DROPDOWN COMPONENTS (AÇILIR PENCERELER)
+// =========================================================================
+
+interface CustomTypologySelectProps {
+  value: FloorTypology;
+  floorNumber: number;
+  totalFloors: number;
+  onOpen?: () => void;
+  onChange: (value: FloorTypology) => void;
+}
+
+export const CustomTypologySelect: React.FC<CustomTypologySelectProps> = ({
+  value,
+  floorNumber,
+  totalFloors,
+  onOpen,
+  onChange,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const availableTypes = getAvailableTypologiesForFloor(floorNumber, totalFloors);
+  const currentKey = availableTypes.includes(value) ? value : availableTypes[0];
+  const selectedInfo = FLOOR_TYPOLOGY_MAP[currentKey] || FLOOR_TYPOLOGY_MAP['residential'];
+  const SelectedIcon = selectedInfo.icon;
+
+  // For lower floors (Kat 1 & Kat 2), pop UPWARDS so the menu is never clipped near the foundation or bottom edge
+  const isBottomFloor = floorNumber <= 2;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => {
+          const nextState = !isOpen;
+          setIsOpen(nextState);
+          if (nextState && onOpen) {
+            onOpen();
+          }
+        }}
+        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition cursor-pointer shadow-inner ${
+          isOpen
+            ? 'border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/10'
+            : 'border-amber-500/40 hover:border-amber-400 hover:bg-slate-900'
+        }`}
+      >
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${selectedInfo.badgeStyle}`}>
+            <SelectedIcon className="w-4 h-4" />
+          </div>
+          <span className="font-bold text-amber-300 text-xs sm:text-sm text-left truncate leading-tight">{selectedInfo.label}</span>
+        </div>
+        <ChevronDown
+          className={`w-4 h-4 text-amber-400 transition-transform duration-200 shrink-0 ml-1.5 ${
+            isOpen ? 'rotate-180 text-amber-300' : ''
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div
+          className={`absolute ${
+            isBottomFloor ? 'bottom-full mb-2.5' : 'top-full mt-2.5'
+          } left-0 right-0 w-full min-w-full sm:min-w-[300px] bg-slate-950/98 border-2 border-amber-500/60 rounded-2xl p-2 shadow-[0_15px_50px_rgba(0,0,0,0.9)] z-[100] space-y-1.5 backdrop-blur-2xl animate-fadeIn max-h-80 overflow-y-auto`}
+        >
+          {availableTypes.map((typeKey) => {
+            const info = FLOOR_TYPOLOGY_MAP[typeKey];
+            const Icon = info.icon;
+            const isSelected = typeKey === currentKey;
+
+            return (
+              <button
+                key={typeKey}
+                type="button"
+                onClick={() => {
+                  onChange(typeKey);
+                  setIsOpen(false);
+                }}
+                className={`w-full p-2.5 rounded-xl text-left transition flex items-center justify-between cursor-pointer group ${
+                  isSelected
+                    ? 'bg-gradient-to-r from-amber-500/25 via-amber-500/15 to-slate-900 border border-amber-400/60 text-amber-300 font-extrabold shadow-lg shadow-amber-500/10'
+                    : 'text-slate-200 hover:bg-slate-800/90 hover:text-amber-300 border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 transition ${
+                      isSelected
+                        ? `${info.badgeStyle} shadow-md`
+                        : 'bg-slate-800 border-slate-700 text-slate-400 group-hover:text-amber-300 group-hover:border-amber-500/40'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs sm:text-sm font-bold text-slate-100 group-hover:text-amber-300 truncate">{info.label}</div>
+                    <div className="text-[11px] text-slate-400 font-normal leading-tight mt-0.5 line-clamp-2">{info.desc}</div>
+                  </div>
+                </div>
+                {isSelected && <Check className="w-4.5 h-4.5 text-amber-400 stroke-[3] shrink-0 ml-2" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface CustomUnitCountSelectProps {
+  unitCount: number;
+  unitPrefix: string;
+  floorNumber?: number;
+  onOpen?: () => void;
+  onChange: (count: number) => void;
+}
+
+export const CustomUnitCountSelect: React.FC<CustomUnitCountSelectProps> = ({
+  unitCount,
+  unitPrefix,
+  floorNumber = 1,
+  onOpen,
+  onChange,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const OPTIONS = [1, 2, 3, 4];
+  const isBottomFloor = floorNumber <= 2;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => {
+          const nextState = !isOpen;
+          setIsOpen(nextState);
+          if (nextState && onOpen) {
+            onOpen();
+          }
+        }}
+        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition cursor-pointer shadow-inner ${
+          isOpen
+            ? 'border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/10'
+            : 'border-slate-700 hover:border-slate-600 hover:bg-slate-900'
+        }`}
+      >
+        <span className="font-bold text-slate-200 text-xs sm:text-sm">
+          {unitCount} Adet {unitPrefix}
+        </span>
+        <ChevronDown
+          className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-1.5 ${
+            isOpen ? 'rotate-180 text-amber-400' : ''
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div
+          className={`absolute ${
+            isBottomFloor ? 'bottom-full mb-2.5' : 'top-full mt-2.5'
+          } left-0 right-0 w-full min-w-full bg-slate-950/98 border-2 border-slate-700 rounded-2xl p-2 shadow-[0_15px_50px_rgba(0,0,0,0.9)] z-[100] space-y-1 backdrop-blur-2xl animate-fadeIn max-h-60 overflow-y-auto`}
+        >
+          {OPTIONS.map((num) => {
+            const isSelected = num === unitCount;
+            return (
+              <button
+                key={num}
+                type="button"
+                onClick={() => {
+                  onChange(num);
+                  setIsOpen(false);
+                }}
+                className={`w-full px-3.5 py-2.5 rounded-xl text-left transition flex items-center justify-between cursor-pointer ${
+                  isSelected
+                    ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300 font-extrabold shadow-sm'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <span className="text-xs sm:text-sm font-semibold">
+                  {num} Adet {unitPrefix}
+                </span>
+                {isSelected && <Check className="w-4.5 h-4.5 text-amber-400 stroke-[3] shrink-0 ml-2" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// =========================================================================
+// MAIN BUILDING VIEWER COMPONENT
+// =========================================================================
 
 interface BuildingViewerProps {
   project?: Project;
   floors: BuildingFloor[];
   onToggleFloorStage?: (floorId: string, stageId: string, isCompleted: boolean) => void;
   onToggleUnitStage?: (unitId: string, stageId: string, isCompleted: boolean) => void;
+  onUpdateProject?: (updated: Project) => void;
   isContractor?: boolean;
 }
 
@@ -16,15 +410,192 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
   floors = [],
   onToggleFloorStage,
   onToggleUnitStage,
+  onUpdateProject,
   isContractor = true,
 }) => {
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-  const [filterMode, setFilterMode] = useState<'all' | 'live' | 'shadow'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  const storageKey = `golgeden_bina_ayarlari_${project?.id || 'default'}`;
+  const roofStorageKey = `golgeden_roof_completed_${project?.id || 'default'}`;
+  const settingsModeStorageKey = `golgeden_settings_mode_${project?.id || 'default'}`;
+
+  // Settings mode toggle: defaults to false (Normal Inspection View) so page refresh stays on main view
+  const [isSettingsMode, setIsSettingsMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(`golgeden_settings_mode_${project?.id || 'default'}`);
+      return saved !== null ? saved === 'true' : false;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const toggleSettingsMode = () => {
+    setIsSettingsMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(settingsModeStorageKey, String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const [floorTypologies, setFloorTypologies] = useState<Record<string, FloorTypologyConfig>>({});
+
+  const [isRoofMarkedManual, setIsRoofMarkedManual] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(`golgeden_roof_completed_${project?.id || 'default'}`) === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const totalFloors = floors.length;
+
+  useEffect(() => {
+    try {
+      setIsRoofMarkedManual(localStorage.getItem(roofStorageKey) === 'true');
+    } catch (e) {}
+  }, [project?.id]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        setFloorTypologies(JSON.parse(saved));
+      } else {
+        const initialMap: Record<string, FloorTypologyConfig> = {};
+        floors.forEach((f) => {
+          initialMap[f.id] = {
+            type: f.floor_number === 1 ? 'commercial_shop' : 'residential',
+            unitCount: f.units?.length || 3,
+          };
+        });
+        setFloorTypologies(initialMap);
+      }
+    } catch (e) {
+      console.error('Bina ayarları yüklenemedi:', e);
+    }
+  }, [project?.id, floors]);
+
+  const saveTypologies = (newMap: Record<string, FloorTypologyConfig>) => {
+    setFloorTypologies(newMap);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(newMap));
+      setSuccessToast('Kat ayarları güncellendi ve kaydedildi!');
+      setTimeout(() => setSuccessToast(null), 3000);
+    } catch (e) {
+      console.error('Bina ayarları kaydedilemedi:', e);
+    }
+
+    if (project && onUpdateProject) {
+      let totalUnitsCount = 0;
+      const topFloor = floors.find((f) => f.floor_number === totalFloors);
+      const topTypoConfig = topFloor ? newMap[topFloor.id] || getFloorTypology(topFloor.id) : null;
+      const topFloorTypo = topTypoConfig?.type;
+
+      const updatedFloors = floors.map((floor) => {
+        const typoConfig = newMap[floor.id] || getFloorTypology(floor.id);
+        const effectiveUnits = getEffectiveFloorUnitsFromUtil(floor, typoConfig, totalFloors, project.id, topFloorTypo);
+        totalUnitsCount += effectiveUnits.length;
+        return {
+          ...floor,
+          units: effectiveUnits,
+        };
+      });
+      onUpdateProject({
+        ...project,
+        floors: updatedFloors,
+        unit_count: totalUnitsCount,
+      });
+    }
+  };
+
+  const getFloorTypology = (floorId: string): FloorTypologyConfig => {
+    return floorTypologies[floorId] || { type: 'residential', unitCount: 3 };
+  };
+
+  const getEffectiveFloorUnits = (floor: BuildingFloor): Unit[] => {
+    const topFloor = floors.find((f) => f.floor_number === totalFloors);
+    const topTypoConfig = topFloor ? getFloorTypology(topFloor.id) : null;
+    const topFloorTypo = topTypoConfig?.type;
+
+    if (
+      floor.floor_number === totalFloors - 1 &&
+      totalFloors > 1 &&
+      topFloorTypo === 'duplex'
+    ) {
+      return [];
+    }
+
+    const typoConfig = getFloorTypology(floor.id);
+    const typoInfo = FLOOR_TYPOLOGY_MAP[typoConfig.type] || FLOOR_TYPOLOGY_MAP['residential'];
+    const targetCount = typoConfig.unitCount ?? (floor.units?.length || 3);
+    const existingUnits = floor.units || [];
+
+    const isTopDuplexUpper = floor.floor_number === totalFloors && typoConfig.type === 'duplex' && totalFloors > 1;
+
+    const result: Unit[] = [];
+    for (let i = 1; i <= targetCount; i++) {
+      const unitNum = floor.floor_number * 100 + i;
+      let unitName = `${typoInfo.unitPrefix} #${unitNum}`;
+
+      if (isTopDuplexUpper) {
+        unitName = `Dubleks #${unitNum} (Kat ${totalFloors}&${totalFloors - 1})`;
+      }
+
+      if (i <= existingUnits.length) {
+        result.push({
+          ...existingUnits[i - 1],
+          name: unitName,
+          unit_number: unitNum,
+        });
+      } else {
+        result.push({
+          id: `${floor.id}-dyn-unit-${i}`,
+          floor_id: floor.id,
+          unit_number: unitNum,
+          name: unitName,
+          is_completed: false,
+          stages: [
+            {
+              id: `${floor.id}-dyn-unit-${i}-st1`,
+              project_id: project?.id || '',
+              floor_id: floor.id,
+              unit_id: `${floor.id}-dyn-unit-${i}`,
+              name: 'Sıva, Şap & Seramik Kaplama',
+              category: 'ince_isler',
+              estimated_cost: 45000,
+              actual_cost: 0,
+              weight_percentage: 50,
+              is_completed: false,
+              order_index: 1,
+            },
+            {
+              id: `${floor.id}-dyn-unit-${i}-st2`,
+              project_id: project?.id || '',
+              floor_id: floor.id,
+              unit_id: `${floor.id}-dyn-unit-${i}`,
+              name: 'Boya, Aydınlatma & Armatür Montajı',
+              category: 'ince_isler',
+              estimated_cost: 35000,
+              actual_cost: 0,
+              weight_percentage: 50,
+              is_completed: false,
+              order_index: 2,
+            },
+          ],
+        });
+      }
+    }
+    return result;
+  };
 
   const selectedFloor = floors.find((f) => f.id === selectedFloorId);
-  const selectedUnit = selectedFloor?.units?.find((u) => u.id === selectedUnitId) || null;
+  const selectedFloorUnits = selectedFloor ? getEffectiveFloorUnits(selectedFloor) : [];
+  const selectedUnit = selectedFloorUnits.find((u) => u.id === selectedUnitId) || null;
 
   const calculateFloorProgress = (floor: BuildingFloor): number => {
     let totalItems = 0;
@@ -35,8 +606,9 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
       completedItems += floor.stages.filter((s) => s.is_completed).length;
     }
 
-    if (floor.units && floor.units.length > 0) {
-      floor.units.forEach((u) => {
+    const effUnits = getEffectiveFloorUnits(floor);
+    if (effUnits && effUnits.length > 0) {
+      effUnits.forEach((u) => {
         if (u.stages && u.stages.length > 0) {
           totalItems += u.stages.length;
           completedItems += u.stages.filter((s) => s.is_completed).length;
@@ -54,26 +626,280 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
     return Math.round((completedItems / totalItems) * 100);
   };
 
-  const roofFloor = floors.find((f) => f.floor_number === floors.length);
-  const roofDep = project ? checkRoofStatus(project) : { isUnlocked: true };
-  const isRoofDone = roofFloor && roofDep.isUnlocked ? (roofFloor.is_completed || calculateFloorProgress(roofFloor) === 100) : false;
+  const renderFloorInspectionPanel = (floor: BuildingFloor) => {
+    const typoInfo =
+      FLOOR_TYPOLOGY_MAP[getFloorTypology(floor.id).type] || FLOOR_TYPOLOGY_MAP['residential'];
+    const floorUnits = getEffectiveFloorUnits(floor);
 
-  const filteredFloors = floors.filter((floor) => {
-    const progress = calculateFloorProgress(floor);
-    const isFullyDone = progress === 100;
-    if (filterMode === 'live') return isFullyDone;
-    if (filterMode === 'shadow') return !isFullyDone;
-    return true;
-  });
+    return (
+      <div
+        className="mt-5 pt-5 border-t border-slate-800/80 space-y-6 animate-fadeIn text-left"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {toastMessage && (
+          <div className="p-3 bg-rose-500/20 border border-rose-500/50 rounded-xl flex items-center justify-between text-rose-200 text-xs animate-shake">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{toastMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToastMessage(null)}
+              className="text-rose-400 font-bold hover:text-white ml-2 text-sm cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+
+
+        {/* Floor Level Stage Toggles */}
+        {floor.stages && floor.stages.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Katın Yapısal İmalat Aşamaları
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {floor.stages.map((stage) => {
+                const depStatus = project
+                  ? checkFloorStageStatus(project, floor.id, stage.id)
+                  : { isUnlocked: true };
+                const isLocked = !stage.is_completed && !depStatus.isUnlocked;
+
+                const handleStageClick = () => {
+                  if (!isContractor) return;
+                  if (isLocked) {
+                    setToastMessage(depStatus.reason || 'Bu aşama kilitlidir.');
+                    return;
+                  }
+                  setToastMessage(null);
+                  onToggleFloorStage?.(floor.id, stage.id, !stage.is_completed);
+                };
+
+                return (
+                  <div
+                    key={stage.id}
+                    onClick={handleStageClick}
+                    className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-all ${
+                      isLocked
+                        ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
+                        : stage.is_completed
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 cursor-pointer hover:border-amber-500/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 ${
+                          isLocked
+                            ? 'border-slate-700 bg-slate-900/50 text-slate-600 cursor-not-allowed'
+                            : stage.is_completed
+                            ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
+                            : 'border-slate-600 bg-slate-900 hover:border-amber-400 cursor-pointer'
+                        }`}
+                      >
+                        {stage.is_completed ? (
+                          <CheckCircle2 key="chk-completed" className="w-4 h-4 stroke-[3]" />
+                        ) : isLocked ? (
+                          <Lock key="chk-locked" className="w-3 h-3 text-slate-500" />
+                        ) : null}
+                      </span>
+                      <div>
+                        <div className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                          <span>
+                            {floor.floor_number === totalFloors && getFloorTypology(floor.id).type === 'duplex'
+                              ? stage.name.replace(`Kat ${floor.floor_number}`, `Kat ${floor.floor_number} & Kat ${floor.floor_number - 1}`)
+                              : stage.name}
+                          </span>
+                          {isLocked && (
+                            <span className="text-[9px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1 py-0.2 rounded font-normal flex items-center gap-0.5 shrink-0">
+                              <Lock className="w-2 h-2" /> Kilitli
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
+                          Ağırlık: %{stage.weight_percentage || 0} • Tahmini: {(stage.estimated_cost || 0).toLocaleString('tr-TR')} ₺
+                        </div>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 shrink-0 ${
+                        isLocked
+                          ? 'bg-slate-900 text-rose-400 border border-rose-500/30'
+                          : stage.is_completed
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      }`}
+                    >
+                      {isLocked && <Lock className="w-2.5 h-2.5 shrink-0" />}
+                      <span>
+                        {isLocked
+                          ? 'Kilitli'
+                          : stage.is_completed
+                          ? 'Tamamlandı'
+                          : 'Bekliyor'}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Floor Units Grid View */}
+        <div>
+          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+            <span>
+              Kata Ait {typoInfo.unitPrefix}ler ({floorUnits.length} Birim)
+            </span>
+            <span className="text-[10px] text-amber-400 font-normal">
+              Tıklayarak birim aşamalarını açın
+            </span>
+          </h4>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {floorUnits.map((unit) => {
+              const isUnitSelected = selectedUnitId === unit.id;
+
+              return (
+                <div
+                  key={unit.id}
+                  onClick={() => setSelectedUnitId(isUnitSelected ? null : unit.id)}
+                  className={`
+                    p-4 rounded-xl border cursor-pointer transition-all duration-300 relative overflow-hidden group
+                    ${
+                      unit.is_completed
+                        ? 'bg-amber-500/10 border-amber-500/50 hover:bg-amber-500/20'
+                        : 'bg-slate-800/50 border-slate-700/80 opacity-70 hover:opacity-100'
+                    }
+                    ${isUnitSelected ? 'ring-2 ring-amber-400 shadow-lg' : ''}
+                  `}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-white text-sm group-hover:text-amber-300">
+                      {unit.name}
+                    </span>
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        unit.is_completed
+                          ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]'
+                          : 'bg-slate-600'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="text-xs text-slate-400 flex items-center justify-between mt-3">
+                    <span>{unit.is_completed ? '100% Tamamlandı' : 'İmalat Sürecinde'}</span>
+                    <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Selected Unit Stage Inspector Sub-panel */}
+        {selectedUnit && selectedUnit.floor_id === floor.id && (
+          <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 mt-4 animate-fadeIn">
+            <div className="flex justify-between items-center mb-3 border-b border-slate-800 pb-2">
+              <h5 className="font-bold text-sm text-amber-300">
+                {selectedUnit.name} İmalat Aşamaları
+              </h5>
+              <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30">
+                {selectedUnit.is_completed ? 'Tamamlandı' : 'Süreçte'}
+              </span>
+            </div>
+
+            {selectedUnit?.stages && selectedUnit.stages.length > 0 ? (
+              <div className="space-y-2">
+                {selectedUnit.stages.map((st) => {
+                  const unitDep = project
+                    ? checkUnitStageStatus(project, selectedUnit.id, st.id)
+                    : { isUnlocked: true };
+                  const isUnitStLocked = !st.is_completed && !unitDep.isUnlocked;
+
+                  const handleUnitStageClick = () => {
+                    if (!isContractor) return;
+                    if (isUnitStLocked) {
+                      setToastMessage(unitDep.reason || 'Bu birim imalatı kilitlidir.');
+                      return;
+                    }
+                    setToastMessage(null);
+                    onToggleUnitStage?.(selectedUnit.id, st.id, !st.is_completed);
+                  };
+
+                  return (
+                    <div
+                      key={st.id}
+                      onClick={handleUnitStageClick}
+                      className={`flex items-center justify-between text-xs p-2.5 rounded-lg border transition-all ${
+                        isUnitStLocked
+                          ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
+                          : st.is_completed
+                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                            isUnitStLocked
+                              ? 'border-slate-700 bg-slate-950 text-slate-600 cursor-not-allowed'
+                              : st.is_completed
+                              ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
+                              : 'border-slate-600 cursor-pointer'
+                          }`}
+                        >
+                          {st.is_completed ? (
+                            <CheckCircle2 key="uchk-completed" className="w-3 h-3 stroke-[3]" />
+                          ) : isUnitStLocked ? (
+                            <Lock key="uchk-locked" className="w-2.5 h-2.5 text-slate-500" />
+                          ) : null}
+                        </span>
+                        <span className="text-white font-medium flex items-center gap-1.5">
+                          <span>{st.name}</span>
+                          {isUnitStLocked && (
+                            <span className="text-[9px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1 py-0.2 rounded flex items-center gap-0.5">
+                              <Lock className="w-2 h-2" /> Kilitli
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <span className="text-slate-400">{(st.estimated_cost || 0).toLocaleString('tr-TR')} ₺</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400 italic text-center py-2">
+                Bu birim için standart ince işler aşamaları otomatik tanımlanmıştır.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const roofDep = project ? checkRoofStatus(project) : { isUnlocked: true };
+  const isRoofDone = roofDep.isUnlocked && isRoofMarkedManual;
+
+  const projectStages = project?.stages ?? [];
+  const isFoundationDone = projectStages.length > 0 && projectStages.every((s) => s.is_completed);
+
+  const filteredFloors = floors;
 
   return (
-    <div className="bg-slate-950/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+    <div className="bg-slate-950/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl relative">
       {/* Decorative Glow Background */}
       <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 -mb-12 -ml-12 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Header & Metaphor Legend Filter Bar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-slate-800/80 pb-5">
+      {/* Header & Building Settings Mode Button */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-slate-800/80 pb-5">
         <div>
           <div className="flex items-center gap-2 text-amber-400 font-medium text-xs tracking-wider uppercase mb-1">
             <Sparkles className="w-4 h-4 animate-pulse" />
@@ -85,492 +911,563 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
           </h2>
         </div>
 
-        {/* Interactive Filter Buttons */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-1 flex items-center shadow-lg text-xs gap-1">
-          <button
-            type="button"
-            onClick={() => setFilterMode('all')}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-              filterMode === 'all'
-                ? 'bg-slate-800 text-white shadow-md border border-slate-700'
-                : 'text-slate-400 hover:text-white'
+        {/* TOP RIGHT: Building Settings Toggle Button */}
+        <button
+          onClick={toggleSettingsMode}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg cursor-pointer backdrop-blur-md shrink-0 border ${
+            isSettingsMode
+              ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-amber-500/30 font-extrabold'
+              : 'bg-slate-900 border-slate-700 text-amber-300 hover:border-amber-500/50'
+          }`}
+        >
+          <SlidersHorizontal className={`w-4 h-4 ${isSettingsMode ? 'text-slate-950' : 'text-amber-400'}`} />
+          <span>Kat & Bina Yapı Ayarları</span>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ml-1 ${
+              isSettingsMode
+                ? 'bg-slate-950/20 text-slate-950 border border-slate-950/30'
+                : 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
             }`}
           >
-            TÜM KATLAR ({floors.length})
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFilterMode('live')}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              filterMode === 'live'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-yellow-300 shadow-[0_0_8px_rgba(245,158,11,1)]" />
-            <span>CANLI (Tamamlanan)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFilterMode('shadow')}
-            className={`px-3 py-1.5 rounded-xl font-medium transition-all flex items-center gap-2 cursor-pointer ${
-              filterMode === 'shadow'
-                ? 'bg-slate-800 text-amber-400 border border-amber-500/40 shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-700 border border-dashed border-slate-500" />
-            <span>GÖLGE (Bekleyen)</span>
-          </button>
-        </div>
+            {isSettingsMode ? 'Ayarlar Açık' : 'Ayarları Göster'}
+          </span>
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Isometric Architectural House Blueprint Visualizer */}
-        <div className="lg:col-span-6 flex flex-col items-center">
+      {/* Success Notification Banner */}
+      {successToast && (
+        <div className="mb-6 p-3 bg-emerald-500/20 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 text-xs animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{successToast}</span>
+          </div>
+          <button onClick={() => setSuccessToast(null)} className="text-emerald-400 hover:text-white font-bold cursor-pointer">
+            ✕
+          </button>
+        </div>
+      )}
 
-          {/* Roof Architecture Graphic */}
+      {/* Quick Info Bar when Settings Mode is ON */}
+      {isSettingsMode && (
+        <div className="mb-6 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-200 flex items-center gap-2 animate-fadeIn">
+          <Info className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>
+            Her katın kullanım amacını (Dükkan, Ofis, Daire, Ters Dubleks, Dubleks) ve birim sayısını <strong>doğrudan o katın sağındaki menülerden</strong> düzenleyebilirsiniz.
+          </span>
+        </div>
+      )}
+
+      {/* Main Building Stack View */}
+      <div className="w-full max-w-5xl mx-auto flex flex-col items-center">
+        {/* Roof Architecture Graphic (Only visible when Settings Mode is OFF) */}
+        {!isSettingsMode && (
           <div
-            onClick={() => roofFloor && setSelectedFloorId(roofFloor.id)}
-            className="w-full max-w-md relative mb-2 cursor-pointer group"
+            onClick={() => {
+              if (!isContractor) return;
+              if (!roofDep.isUnlocked) {
+                setToastMessage(roofDep.reason || 'Çatı imalatı için önce tüm katların kolon ve duvar imalatları tamamlanmalıdır.');
+                return;
+              }
+              setToastMessage(null);
+              const nextState = !isRoofMarkedManual;
+              setIsRoofMarkedManual(nextState);
+              try {
+                localStorage.setItem(roofStorageKey, String(nextState));
+              } catch (e) {}
+
+              setSuccessToast(nextState ? 'Çatı & yalıtım imalatı tamamlandı olarak kaydedildi!' : 'Çatı imalat durumu güncellendi.');
+              setTimeout(() => setSuccessToast(null), 3000);
+
+              if (project && onUpdateProject) {
+                onUpdateProject({ ...project });
+              }
+            }}
+            className="w-full relative mb-2 cursor-pointer group"
           >
             <div
-              className={`w-full h-16 rounded-t-3xl border-t-2 border-x-2 transition-all duration-700 flex flex-col items-center justify-center relative overflow-hidden group-hover:border-amber-400 ${
+              className={`w-full h-16 rounded-t-3xl border-t-2 border-x-2 transition-all duration-700 flex items-center justify-between px-6 relative overflow-hidden group-hover:border-amber-400 ${
                 isRoofDone
                   ? 'bg-gradient-to-b from-amber-500 via-amber-600 to-amber-950 border-amber-400 shadow-[0_-5px_25px_rgba(245,158,11,0.5)]'
-                  : 'bg-slate-900/80 border-slate-800 border-dashed opacity-50'
+                  : 'bg-slate-900/80 border-slate-800 border-dashed opacity-75 hover:opacity-100'
               }`}
             >
-              {/* Triangular Roof Silhouette Overlay */}
-              <div className="text-xs font-black uppercase tracking-widest text-slate-100 flex items-center gap-2 z-10">
-                <Home className={`w-4 h-4 ${isRoofDone ? 'text-yellow-300 animate-bounce' : 'text-slate-500'}`} />
-                <span>{isRoofDone ? 'ÇATI & ÇATIKATI (CANLI)' : 'ÇATI İSKELETİ (GÖLGE)'}</span>
+              <div className="flex items-center gap-3 z-10">
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${
+                    isRoofDone
+                      ? 'bg-amber-400 border-yellow-200 text-slate-950 shadow-md'
+                      : !roofDep.isUnlocked
+                      ? 'border-slate-700 bg-slate-900/60 text-slate-600'
+                      : 'border-slate-600 bg-slate-900 text-slate-400 group-hover:border-amber-400'
+                  }`}
+                >
+                  {isRoofDone ? (
+                    <CheckCircle2 className="w-5 h-5 stroke-[3]" />
+                  ) : !roofDep.isUnlocked ? (
+                    <Lock className="w-4 h-4 text-slate-500" />
+                  ) : (
+                    <Home className="w-4 h-4 text-amber-400" />
+                  )}
+                </div>
+
+                <div className="text-left">
+                  <div className="text-xs font-black uppercase tracking-widest text-slate-100 flex items-center gap-2">
+                    <span>{isRoofDone ? 'ÇATI & ÇATIKATI (CANLI)' : 'ÇATI İSKELETİ & YALITIM'}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-300">
+                    {isRoofDone ? 'Su Yalıtımı & Kaplama Tamamlandı' : 'Tıklayarak Çatıyı Yapıldı / Yapılmadı İşaretleyin'}
+                  </div>
+                </div>
               </div>
-              <div className="text-[10px] text-slate-300 z-10">
-                {isRoofDone ? 'Su Yalıtımı & Kaplama Tamamlandı' : 'Makas & Yalıtım Bekliyor'}
+
+              {/* Right Side Status Pill */}
+              <div className="z-10 flex items-center gap-2">
+                <span
+                  className={`text-xs px-3 py-1 rounded-full font-bold inline-flex items-center gap-1.5 transition-all ${
+                    !roofDep.isUnlocked
+                      ? 'bg-slate-900 text-rose-400 border border-rose-500/30'
+                      : isRoofDone
+                      ? 'bg-amber-400 text-slate-950 font-black border border-yellow-200 shadow-lg shadow-amber-500/30'
+                      : 'bg-slate-800 text-amber-300 border border-slate-700 group-hover:border-amber-500/50'
+                  }`}
+                >
+                  {!roofDep.isUnlocked ? (
+                    <>
+                      <Lock className="w-3 h-3 shrink-0" />
+                      <span>Kilitli (Ön Koşul)</span>
+                    </>
+                  ) : isRoofDone ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 stroke-[3]" />
+                      <span>Tamamlandı ✓</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-slate-500" />
+                      <span>Yapıldı İşaretle</span>
+                    </>
+                  )}
+                </span>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Floor & Apartment Units Layer Stack */}
-          <div className="w-full max-w-md space-y-3 relative">
+        {/* Floor Stack List - Each Floor Row Contains its OWN Settings Controls directly on its Right Side! */}
+        <div className="w-full space-y-3 relative">
             {filteredFloors.length > 0 ? (
               [...filteredFloors]
                 .sort((a, b) => b.floor_number - a.floor_number)
                 .map((floor) => {
-              const isSelected = selectedFloorId === floor.id;
-              const progress = calculateFloorProgress(floor);
-              const isFullyDone = progress === 100;
+                  const topFloor = floors.find((f) => f.floor_number === totalFloors);
+                  const isTopDuplex = topFloor && getFloorTypology(topFloor.id).type === 'duplex';
 
-              return (
-                <div
-                  key={floor.id}
-                  onClick={() => {
-                    setSelectedFloorId(isSelected ? null : floor.id);
-                    setSelectedUnitId(null);
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setSelectedFloorId(floor.id);
-                    setSelectedUnitId(null);
-                  }}
-                  className={`
-                    relative cursor-pointer transition-all duration-500 transform rounded-2xl border p-4 group
-                    ${
-                      isSelected
-                        ? 'scale-[1.02] ring-2 ring-amber-400/80 z-20 shadow-[0_0_30px_rgba(245,158,11,0.3)]'
-                        : 'hover:scale-[1.01]'
-                    }
-                    ${
-                      isFullyDone
-                        ? 'bg-gradient-to-r from-amber-950/90 via-amber-900/50 to-slate-900 border-amber-500/80 shadow-[0_0_20px_rgba(245,158,11,0.25)]'
-                        : 'bg-slate-900/60 opacity-60 hover:opacity-90 border-slate-800 border-dashed backdrop-blur-md'
-                    }
-                  `}
-                >
-                  {/* Left Column Window Accent Line */}
-                  <div
-                    className={`absolute top-0 left-0 bottom-0 w-2 rounded-l-2xl transition-all duration-500 ${
-                      isFullyDone
-                        ? 'bg-gradient-to-b from-amber-400 to-yellow-500 shadow-[0_0_12px_rgba(245,158,11,0.9)]'
-                        : 'bg-slate-700 opacity-40'
-                    }`}
-                  />
+                  // If this floor is Kat 5 (totalFloors - 1) and top floor (Kat 6) is duplex, skip it (it is merged into Kat 6 single thick box)
+                  if (isTopDuplex && floor.floor_number === totalFloors - 1 && totalFloors > 1) {
+                    return null;
+                  }
 
-                  <div className="flex items-center justify-between pl-3">
-                    <div className="flex items-center gap-3">
-                      {/* Floor Number Badge */}
+                  const isDuplexMergedBox = isTopDuplex && floor.floor_number === totalFloors && totalFloors > 1;
+                  const isSelected = selectedFloorId === floor.id;
+                  const progress = calculateFloorProgress(floor);
+                  const isFullyDone = progress === 100;
+                  const currentTypo = getFloorTypology(floor.id);
+                  const availableTypes = getAvailableTypologiesForFloor(floor.floor_number, totalFloors);
+                  const effectiveTypeKey = availableTypes.includes(currentTypo.type)
+                    ? currentTypo.type
+                    : availableTypes[0];
+                  const typoInfo = FLOOR_TYPOLOGY_MAP[effectiveTypeKey] || FLOOR_TYPOLOGY_MAP['residential'];
+                  const TypoIcon = typoInfo.icon;
+                  const effectiveUnits = getEffectiveFloorUnits(floor);
+
+                  if (isDuplexMergedBox) {
+                    return (
                       <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-xs transition-all duration-300 ${
-                          isFullyDone
-                            ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/50'
-                            : 'bg-slate-800 text-slate-400 group-hover:text-white'
-                        }`}
-                      >
-                        {floor.floor_number}.K
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-white group-hover:text-amber-300 transition-colors">
-                            {floor.name}
-                          </h3>
-                          {isFullyDone ? (
-                            <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> CANLI
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700 flex items-center gap-1">
-                              <CircleDashed className="w-3 h-3 animate-spin" /> GÖLGE SKELETON (%{progress})
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Units Facade Preview Blocks */}
-                        <div className="flex items-center gap-2 mt-1.5">
-                          {floor.units?.map((u) => (
-                            <span
-                              key={u.id}
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-all ${
-                                u.is_completed
-                                  ? 'bg-amber-500/20 border-amber-400/60 text-amber-200 shadow-sm'
-                                  : 'bg-slate-950/80 border-slate-800 text-slate-500'
-                              }`}
-                            >
-                              Daire #{u.unit_number} {u.is_completed ? '✓' : ''}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar & Open Arrow */}
-                    <div className="flex items-center gap-4">
-                      <div className="text-right hidden sm:block">
-                        <div className="text-xs font-semibold text-white">%{progress}</div>
-                        <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                          <div
-                            className={`h-full transition-all duration-700 ${
-                              isFullyDone ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]' : 'bg-slate-600'
-                            }`}
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        key={floor.id}
+                        style={{ zIndex: isSelected ? 100 : floor.floor_number * 10 }}
+                        onClick={() => {
                           setSelectedFloorId(isSelected ? null : floor.id);
                           setSelectedUnitId(null);
                         }}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setSelectedFloorId(floor.id);
-                        }}
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                          isSelected
-                            ? 'bg-amber-500 text-slate-950 shadow-md'
-                            : 'bg-slate-800/80 text-slate-400 group-hover:bg-slate-700 group-hover:text-white'
-                        }`}
-                      >
-                        <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'rotate-90 text-slate-950' : ''}`} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="p-8 text-center bg-slate-900/60 border border-slate-800 rounded-2xl text-xs text-slate-400">
-              Seçili filtreye uygun kat bulunamadı.
-            </div>
-          )}
-
-            {/* Foundation (Temel) Base Visual */}
-            <div className="w-full bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-600/60 rounded-2xl p-4 text-center text-xs font-extrabold text-amber-300 shadow-xl flex items-center justify-center gap-2">
-              <Layers className="w-4 h-4 text-amber-400" />
-              <span>TEMEL RADYE BETON & ZEMİN ETÜDÜ (100% CANLI DOKU)</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Detailed Floor & Apartment Inspection Panel */}
-        <div className="lg:col-span-6 bg-slate-900/90 border border-slate-800 rounded-2xl p-6 min-h-[480px] flex flex-col shadow-2xl">
-          {toastMessage && (
-            <div className="mb-4 p-3 bg-rose-500/20 border border-rose-500/50 rounded-xl flex items-center justify-between text-rose-200 text-xs animate-shake">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>{toastMessage}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setToastMessage(null)}
-                className="text-rose-400 font-bold hover:text-white ml-2 text-sm"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {selectedFloor ? (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <div>
-                  <span className="text-xs text-amber-400 font-bold uppercase tracking-wider">
-                    Seçili Kat İnceleme & İmalat Yönetimi
-                  </span>
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    {selectedFloor.name}
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setSelectedFloorId(null)}
-                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition"
-                >
-                  Kapat
-                </button>
-              </div>
-
-              {/* Floor Level Stage Toggles */}
-              {selectedFloor.stages && selectedFloor.stages.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                    Katın Yapısal İmalat Aşamaları
-                  </h4>
-                  <div className="space-y-2">
-                    {selectedFloor?.stages?.map((stage) => {
-                      const depStatus = project
-                        ? checkFloorStageStatus(project, selectedFloor.id, stage.id)
-                        : { isUnlocked: true };
-
-                      const isLocked = !stage.is_completed && !depStatus.isUnlocked;
-
-                      const handleStageClick = () => {
-                        if (!isContractor) return;
-                        if (isLocked) {
-                          setToastMessage(depStatus.reason || 'Bu aşama kilitlidir.');
-                          return;
-                        }
-                        setToastMessage(null);
-                        onToggleFloorStage?.(selectedFloor.id, stage.id, !stage.is_completed);
-                      };
-
-                      return (
-                        <div
-                          key={stage.id}
-                          onClick={handleStageClick}
-                          className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
-                            isLocked
-                              ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
-                              : stage.is_completed
-                              ? 'bg-amber-500/10 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60'
-                              : 'bg-slate-800/40 border-slate-700/60 text-slate-400 cursor-pointer hover:border-amber-500/60'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
-                                isLocked
-                                  ? 'border-slate-700 bg-slate-900/50 text-slate-600 cursor-not-allowed'
-                                  : stage.is_completed
-                                  ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
-                                  : 'border-slate-600 bg-slate-900 hover:border-amber-400 cursor-pointer'
-                              }`}
-                            >
-                              {stage.is_completed ? (
-                                <CheckCircle2 key="chk-completed" className="w-4 h-4 stroke-[3]" />
-                              ) : isLocked ? (
-                                <Lock key="chk-locked" className="w-3 h-3 text-slate-500" />
-                              ) : null}
-                            </span>
-                            <div>
-                              <div className="text-sm font-bold text-white flex items-center gap-2">
-                                <span>{stage.name}</span>
-                                {isLocked && (
-                                  <span className="text-[10px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded font-normal flex items-center gap-1">
-                                    <Lock className="w-2.5 h-2.5" /> Kilitli
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[11px] text-slate-400">
-                                Ağırlık: %{stage.weight_percentage || 0} • Tahmini Maliyet: {(stage.estimated_cost || 0).toLocaleString('tr-TR')} ₺
-                              </div>
-                            </div>
-                          </div>
-
-                          <span
-                            className={`text-xs px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1.5 ${
-                              isLocked
-                                ? 'bg-slate-900 text-rose-400 border border-rose-500/30'
-                                : stage.is_completed
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                                : 'bg-slate-800 text-slate-400 border border-slate-700'
-                            }`}
-                          >
-                            {isLocked && <Lock className="w-3 h-3 shrink-0" />}
-                            <span>
-                              {isLocked
-                                ? 'Kilitli (Ön Koşul)'
-                                : stage.is_completed
-                                ? 'Canlı / Tamamlandı'
-                                : 'Gölge / Bekliyor'}
-                            </span>
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Floor Units Grid View */}
-              <div>
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
-                  <span>Kata Ait Daireler ({selectedFloor.units?.length || 0} Daire)</span>
-                  <span className="text-[10px] text-amber-400 font-normal">
-                    Tıklayarak daire aşamalarını açın
-                  </span>
-                </h4>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {selectedFloor.units?.map((unit) => {
-                    const isUnitSelected = selectedUnitId === unit.id;
-                    return (
-                      <div
-                        key={unit.id}
-                        onClick={() => setSelectedUnitId(isUnitSelected ? null : unit.id)}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          setSelectedUnitId(isUnitSelected ? null : unit.id);
-                        }}
                         className={`
-                          p-4 rounded-xl border cursor-pointer transition-all duration-300 relative overflow-hidden group
+                          relative cursor-pointer transition-all duration-300 rounded-2xl border p-5 sm:p-6 group
                           ${
-                            unit.is_completed
-                              ? 'bg-amber-500/10 border-amber-500/50 hover:bg-amber-500/20'
-                              : 'bg-slate-800/50 border-slate-700/80 opacity-70 hover:opacity-100'
+                            isSelected
+                              ? 'scale-[1.01] ring-2 ring-amber-400/80 border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
+                              : 'hover:scale-[1.005]'
                           }
-                          ${isUnitSelected ? 'ring-2 ring-amber-400 shadow-lg' : ''}
+                          ${
+                            isFullyDone
+                              ? `${typoInfo.badgeStyle} bg-gradient-to-r ${typoInfo.bgGradient}`
+                              : 'bg-slate-900/75 border-slate-800 hover:border-slate-700 backdrop-blur-md'
+                          }
                         `}
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-bold text-white text-sm group-hover:text-amber-300">
-                            {unit.name}
-                          </span>
-                          <span
-                            className={`w-2.5 h-2.5 rounded-full ${
-                              unit.is_completed
-                                ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]'
-                                : 'bg-slate-600'
-                            }`}
-                          />
-                        </div>
+                        {/* Left Column Accent Bar */}
+                        <div
+                          className={`absolute top-0 left-0 bottom-0 w-2 rounded-l-2xl transition-all duration-500 ${
+                            isFullyDone
+                              ? 'bg-gradient-to-b from-amber-400 to-yellow-500 shadow-[0_0_14px_rgba(245,158,11,0.9)]'
+                              : typoInfo.barColor
+                          }`}
+                        />
 
-                        <div className="text-xs text-slate-400 flex items-center justify-between mt-3">
-                          <span>{unit.is_completed ? '100% Tamamlandı (Canlı)' : 'İmalat Sürecinde (Gölge)'}</span>
-                          <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pl-2">
+                          {/* Floor Left Visual Information */}
+                          <div className="flex items-center gap-4 lg:w-5/12">
+                            <div
+                              className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm transition-all duration-300 shrink-0 ${
+                                isSelected
+                                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/50'
+                                  : 'bg-slate-800 text-slate-300 group-hover:text-white'
+                              }`}
+                            >
+                              {totalFloors}-{totalFloors - 1}.K
+                            </div>
 
-              {/* Selected Unit Stage Inspector Sub-panel */}
-              {selectedUnit && (
-                <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 mt-4 animate-fadeIn">
-                  <div className="flex justify-between items-center mb-3 border-b border-slate-800 pb-2">
-                    <h5 className="font-bold text-sm text-amber-300">{selectedUnit.name} İmalat Aşamaları</h5>
-                    <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30">
-                      {selectedUnit.is_completed ? 'Tamamlandı' : 'Süreçte'}
-                    </span>
-                  </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-bold text-white group-hover:text-amber-300 transition-colors text-base">
+                                  Kat {totalFloors} & Kat {totalFloors - 1}
+                                </h3>
 
-                  {selectedUnit?.stages && selectedUnit.stages.length > 0 ? (
-                    <div className="space-y-2">
-                      {selectedUnit.stages.map((st) => {
-                        const unitDep = project
-                          ? checkUnitStageStatus(project, selectedUnit.id, st.id)
-                          : { isUnlocked: true };
-                        const isUnitStLocked = !st.is_completed && !unitDep.isUnlocked;
+                                <span
+                                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 ${typoInfo.badgeStyle}`}
+                                >
+                                  <TypoIcon className="w-3.5 h-3.5" />
+                                  <span>{typoInfo.shortBadge} ({effectiveUnits.length} Birim)</span>
+                                </span>
+                              </div>
 
-                        const handleUnitStageClick = () => {
-                          if (!isContractor) return;
-                          if (isUnitStLocked) {
-                            setToastMessage(unitDep.reason || 'Bu daire imalatı kilitlidir.');
-                            return;
-                          }
-                          setToastMessage(null);
-                          onToggleUnitStage?.(selectedUnit.id, st.id, !st.is_completed);
-                        };
+                              {/* Units Preview Blocks */}
+                              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                {effectiveUnits.map((u) => (
+                                  <span
+                                    key={u.id}
+                                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border transition-all ${
+                                      u.is_completed
+                                        ? 'bg-amber-500/20 border-amber-400/60 text-amber-200 shadow-sm'
+                                        : 'bg-slate-950/80 border-slate-800 text-slate-400'
+                                    }`}
+                                  >
+                                    {u.name} {u.is_completed ? '✓' : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
 
-                        return (
-                          <div
-                            key={st.id}
-                            onClick={handleUnitStageClick}
-                            className={`flex items-center justify-between text-xs p-2.5 rounded-lg border transition-all ${
-                              isUnitStLocked
-                                ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
-                                : st.is_completed
-                                ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
-                                : 'bg-slate-900 border-slate-800 text-slate-400 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
-                                  isUnitStLocked
-                                    ? 'border-slate-700 bg-slate-950 text-slate-600 cursor-not-allowed'
-                                    : st.is_completed
-                                    ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
-                                    : 'border-slate-600 cursor-pointer'
+                          {/* RIGHT SIDE OF THIS EXACT SAME FLOOR ROW: SETTINGS CONTROLS OR PROGRESS */}
+                          {isSettingsMode ? (
+                            <div
+                              className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80 lg:border-l lg:pl-6 lg:w-7/12 shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {/* Custom Typology Select */}
+                              <div>
+                                <label className="block text-xs font-bold text-amber-400/90 uppercase tracking-wider mb-1.5">
+                                  Kat Kullanım Amacı:
+                                </label>
+                                <CustomTypologySelect
+                                  value={effectiveTypeKey}
+                                  floorNumber={floor.floor_number}
+                                  totalFloors={totalFloors}
+                                  onOpen={() => setSelectedFloorId(floor.id)}
+                                  onChange={(newType) => {
+                                    setSelectedFloorId(floor.id);
+                                    const updated = {
+                                      ...floorTypologies,
+                                      [floor.id]: {
+                                        ...currentTypo,
+                                        type: newType,
+                                      },
+                                    };
+                                    saveTypologies(updated);
+                                  }}
+                                />
+                              </div>
+
+                              {/* Custom Unit Count Select */}
+                              <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                                  Kattaki Dubleks Sayısı:
+                                </label>
+                                <CustomUnitCountSelect
+                                  unitCount={currentTypo.unitCount ?? (floor.units?.length || 3)}
+                                  unitPrefix={typoInfo.unitPrefix}
+                                  floorNumber={floor.floor_number}
+                                  onOpen={() => setSelectedFloorId(floor.id)}
+                                  onChange={(count) => {
+                                    setSelectedFloorId(floor.id);
+                                    const updated = {
+                                      ...floorTypologies,
+                                      [floor.id]: {
+                                        ...currentTypo,
+                                        type: effectiveTypeKey,
+                                        unitCount: count,
+                                      },
+                                    };
+                                    saveTypologies(updated);
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-4">
+                              <div className="text-right hidden sm:block">
+                                <div className="text-xs font-semibold text-white">%{progress}</div>
+                                <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                                  <div
+                                    className={`h-full transition-all duration-700 ${
+                                      isFullyDone ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]' : 'bg-slate-600'
+                                    }`}
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedFloorId(isSelected ? null : floor.id);
+                                  setSelectedUnitId(null);
+                                }}
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                                  isSelected
+                                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                                    : 'bg-slate-800/80 text-slate-400 group-hover:bg-slate-700 group-hover:text-white'
                                 }`}
                               >
-                                {st.is_completed ? (
-                                  <CheckCircle2 key="uchk-completed" className="w-3 h-3 stroke-[3]" />
-                                ) : isUnitStLocked ? (
-                                  <Lock key="uchk-locked" className="w-2.5 h-2.5 text-slate-500" />
-                                ) : null}
-                              </span>
-                              <span className="text-white font-medium flex items-center gap-1.5">
-                                <span>{st.name}</span>
-                                {isUnitStLocked && (
-                                  <span className="text-[9px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1 py-0.2 rounded flex items-center gap-0.5">
-                                    <Lock className="w-2 h-2" /> Kilitli
-                                  </span>
-                                )}
+                                <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'rotate-90 text-slate-950' : ''}`} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {isSelected && !isSettingsMode && renderFloorInspectionPanel(floor)}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={floor.id}
+                      style={{ zIndex: isSelected ? 100 : floor.floor_number * 10 }}
+                      onClick={() => {
+                        setSelectedFloorId(isSelected ? null : floor.id);
+                        setSelectedUnitId(null);
+                      }}
+                      className={`
+                        relative cursor-pointer transition-all duration-300 rounded-2xl border p-5 sm:p-6 group
+                        ${
+                          isSelected
+                            ? 'scale-[1.01] ring-2 ring-amber-400/80 border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
+                            : 'hover:scale-[1.005]'
+                        }
+                        ${
+                          isFullyDone
+                            ? `${typoInfo.badgeStyle} bg-gradient-to-r ${typoInfo.bgGradient}`
+                            : 'bg-slate-900/75 border-slate-800 hover:border-slate-700 backdrop-blur-md'
+                        }
+                      `}
+                    >
+                      {/* Left Column Accent Bar */}
+                      <div
+                        className={`absolute top-0 left-0 bottom-0 w-2 rounded-l-2xl transition-all duration-500 ${
+                          isFullyDone
+                            ? 'bg-gradient-to-b from-amber-400 to-yellow-500 shadow-[0_0_14px_rgba(245,158,11,0.9)]'
+                            : typoInfo.barColor
+                        }`}
+                      />
+
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pl-2">
+                        {/* Floor Left Visual Information */}
+                        <div className="flex items-center gap-4 lg:w-5/12">
+                          <div
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm transition-all duration-300 shrink-0 ${
+                              isSelected
+                                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/50'
+                                : 'bg-slate-800 text-slate-300 group-hover:text-white'
+                            }`}
+                          >
+                            {floor.floor_number}.K
+                          </div>
+
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-bold text-white group-hover:text-amber-300 transition-colors text-base">
+                                {floor.name}
+                              </h3>
+
+                              <span
+                                className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 ${typoInfo.badgeStyle}`}
+                              >
+                                <TypoIcon className="w-3.5 h-3.5" />
+                                <span>{typoInfo.shortBadge} ({effectiveUnits.length} Birim)</span>
                               </span>
                             </div>
-                            <span className="text-slate-400">{(st.estimated_cost || 0).toLocaleString('tr-TR')} ₺</span>
+
+                            {/* Units Preview Blocks */}
+                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                              {effectiveUnits.map((u) => (
+                                <span
+                                  key={u.id}
+                                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border transition-all ${
+                                    u.is_completed
+                                      ? 'bg-amber-500/20 border-amber-400/60 text-amber-200 shadow-sm'
+                                      : 'bg-slate-950/80 border-slate-800 text-slate-400'
+                                  }`}
+                                >
+                                  {u.name} {u.is_completed ? '✓' : ''}
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                        );
-                      })}
+                        </div>
+
+                        {/* RIGHT SIDE OF THIS EXACT SAME FLOOR ROW: SETTINGS CONTROLS OR PROGRESS */}
+                        {isSettingsMode ? (
+                          <div
+                            className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80 lg:border-l lg:pl-6 lg:w-7/12 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {/* Custom Typology Select directly on the right side of this floor */}
+                            <div>
+                              <label className="block text-xs font-bold text-amber-400/90 uppercase tracking-wider mb-1.5">
+                                Kat Kullanım Amacı:
+                              </label>
+                              <CustomTypologySelect
+                                value={effectiveTypeKey}
+                                floorNumber={floor.floor_number}
+                                totalFloors={totalFloors}
+                                onOpen={() => setSelectedFloorId(floor.id)}
+                                onChange={(newType) => {
+                                  setSelectedFloorId(floor.id);
+                                  const updated = {
+                                    ...floorTypologies,
+                                    [floor.id]: {
+                                      ...currentTypo,
+                                      type: newType,
+                                    },
+                                  };
+                                  saveTypologies(updated);
+                                }}
+                              />
+                            </div>
+
+                            {/* Custom Unit Count Select directly on the right side of this floor */}
+                            <div>
+                              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                                Kattaki {typoInfo.unitPrefix} Sayısı:
+                              </label>
+                              <CustomUnitCountSelect
+                                unitCount={currentTypo.unitCount ?? (floor.units?.length || 3)}
+                                unitPrefix={typoInfo.unitPrefix}
+                                floorNumber={floor.floor_number}
+                                onOpen={() => setSelectedFloorId(floor.id)}
+                                onChange={(count) => {
+                                  setSelectedFloorId(floor.id);
+                                  const updated = {
+                                    ...floorTypologies,
+                                    [floor.id]: {
+                                      ...currentTypo,
+                                      type: effectiveTypeKey,
+                                      unitCount: count,
+                                    },
+                                  };
+                                  saveTypologies(updated);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-4">
+                            <div className="text-right hidden sm:block">
+                              <div className="text-xs font-semibold text-white">%{progress}</div>
+                              <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                                <div
+                                  className={`h-full transition-all duration-700 ${
+                                    isFullyDone ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]' : 'bg-slate-600'
+                                  }`}
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFloorId(isSelected ? null : floor.id);
+                                setSelectedUnitId(null);
+                              }}
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                                isSelected
+                                  ? 'bg-amber-500 text-slate-950 shadow-md'
+                                  : 'bg-slate-800/80 text-slate-400 group-hover:bg-slate-700 group-hover:text-white'
+                              }`}
+                            >
+                              <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'rotate-90 text-slate-950' : ''}`} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {isSelected && !isSettingsMode && renderFloorInspectionPanel(floor)}
                     </div>
-                  ) : (
-                    <div className="text-xs text-slate-400 italic text-center py-2">
-                      Bu daire için standart ince işler aşamaları otomatik tanımlanmıştır.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="my-auto flex flex-col items-center justify-center text-center p-8">
-              <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-amber-400 mb-4 animate-bounce">
-                <Building2 className="w-8 h-8" />
+                  );
+                })
+              ) : (
+              <div className="p-8 text-center bg-slate-900/60 border border-slate-800 rounded-2xl text-xs text-slate-400">
+                Kat verisi bulunamadı.
               </div>
-              <h3 className="text-lg font-bold text-white mb-1">Kat Katmanını Seçin</h3>
-              <p className="text-xs text-slate-400 max-w-xs">
-                Binanın dikey hiyerarşisindeki herhangi bir kata tıklayarak o katın dairelerini, aşamalarını ve canlanma durumunu detaylıca inceleyin.
-              </p>
+            )}
+
+          </div>
+
+          {/* Foundation Base Visual (Only visible when Settings Mode is OFF) */}
+          {!isSettingsMode && (
+            <div
+              className={`w-full rounded-2xl p-4 text-center text-xs font-extrabold flex items-center justify-center gap-2 transition-all duration-700 mt-2 ${
+                isFoundationDone
+                  ? 'bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-600/60 text-amber-300 shadow-xl shadow-amber-500/20'
+                  : 'bg-slate-900/60 border border-slate-800 border-dashed text-slate-600 opacity-60'
+              }`}
+            >
+              <Layers className={`w-4 h-4 ${isFoundationDone ? 'text-amber-400' : 'text-slate-600'}`} />
+              <span>
+                {isFoundationDone
+                  ? 'TEMEL RADYE BETON & ZEMİN ETÜDÜ (100% CANLI DOKU)'
+                  : 'TEMEL RADYE BETON & ZEMİN ETÜDÜ (GÖLGE — AŞAMALAR BEKLİYOR)'}
+              </span>
+            </div>
+          )}
+
+          {/* Bottom Reset Button for Settings Mode */}
+          {isSettingsMode && (
+            <div className="mt-4 w-full flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  const resetMap: Record<string, FloorTypologyConfig> = {};
+                  floors.forEach((f) => {
+                    resetMap[f.id] = {
+                      type: f.floor_number === 1 ? 'commercial_shop' : 'residential',
+                      unitCount: f.units?.length || 3,
+                    };
+                  });
+                  saveTypologies(resetMap);
+                }}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:border-amber-500/60 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Kat Ayarlarını Sıfırla</span>
+              </button>
             </div>
           )}
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
+
+
+
+
+

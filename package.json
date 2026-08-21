@@ -8,6 +8,7 @@
     "build": "npm --prefix frontend run build",
     "lint": "npm --prefix frontend run lint",
     "preview": "npm --prefix frontend run preview",
-    "backend": "cd backend && go run ./cmd/server"
+    "backend": "cd backend && go run ./cmd/server",
+    "start": "npx concurrently \"npm run backend\" \"npm run dev\""
   }
 }
