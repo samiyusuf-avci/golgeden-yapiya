@@ -42,7 +42,7 @@ export function getEffectiveFloorUnits(
   }
 
   const unitPrefix = TYPOLOGY_PREFIX_MAP[typoConfig.type] || 'Daire';
-  const targetCount = typoConfig.unitCount ?? (floor.units?.length || 3);
+  const targetCount = typoConfig.unitCount ?? (floor.units?.length || 2);
   const existingUnits = floor.units || [];
 
   const isTopDuplexUpper =
@@ -137,7 +137,7 @@ export function syncProjectFloorSettings(project: Project): Project {
         ? 'duplex_bottom'
         : 'residential';
 
-    const defaultUnitCount = floor.floor_number === totalFloors ? 2 : 3;
+    const defaultUnitCount = floor.units?.length || 2;
 
     const typoConfig: FloorTypologyConfig = typologiesMap[floor.id] || {
       type: defaultType,

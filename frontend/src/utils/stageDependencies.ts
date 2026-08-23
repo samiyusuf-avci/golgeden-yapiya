@@ -89,7 +89,7 @@ export function checkFloorStageStatus(
 
   // Find target stage
   const targetStage = targetFloor.stages?.find((s) => s.id === stageId);
-  const targetIsStructural = targetStage ? isStructuralStage(targetStage) : false;
+  if (!targetStage) return { isUnlocked: true };
 
   // 2. Check lower floors (sorted by floor_number ascending)
   const sortedFloors = [...project.floors].sort((a, b) => a.floor_number - b.floor_number);
@@ -117,30 +117,19 @@ export function checkFloorStageStatus(
       }
 
       if (lowerFloor.stages && lowerFloor.stages.length > 0) {
-        if (targetIsStructural) {
-          // Structural framework stage only depends on lower floor's structural framework stage
-          const incompleteLowerStructural = lowerFloor.stages.find(
-            (s) => isStructuralStage(s) && !s.is_completed
-          );
-          if (incompleteLowerStructural) {
-            return {
-              isUnlocked: false,
-              reason: `Öncelikle alt kat olan ${lowerFloor.name} imalatı ("${incompleteLowerStructural.name}") tamamlanmalıdır.`,
-              prerequisiteName: incompleteLowerStructural.name,
-            };
-          }
-        } else {
-          // Non-structural stage (e.g. Duvar Örme) requires lower floor structural stage
-          const incompleteLowerStructural = lowerFloor.stages.find(
-            (s) => isStructuralStage(s) && !s.is_completed
-          );
-          if (incompleteLowerStructural) {
-            return {
-              isUnlocked: false,
-              reason: `Öncelikle alt kat olan ${lowerFloor.name} imalatı ("${incompleteLowerStructural.name}") tamamlanmalıdır.`,
-              prerequisiteName: incompleteLowerStructural.name,
-            };
-          }
+        const incompleteLowerStructural = lowerFloor.stages.find(
+          (s) => isStructuralStage(s) && !s.is_completed
+        );
+        if (incompleteLowerStructural) {
+          const cleanStage = incompleteLowerStructural.name
+            .replace(/^\d+\.\s*Kat\s*/i, '')
+            .replace(/^Kat\s*\d+\s*-\s*/i, '')
+            .trim();
+          return {
+            isUnlocked: false,
+            reason: `Öncelikle alt kat olan ${lowerFloor.floor_number}. Kat imalatı ("${cleanStage || incompleteLowerStructural.name}") tamamlanmalıdır.`,
+            prerequisiteName: incompleteLowerStructural.name,
+          };
         }
       }
     }
@@ -207,9 +196,13 @@ export function checkUnitStageStatus(
 
     const incompleteFloorStage = parentFloor.stages.find((s) => !s.is_completed);
     if (incompleteFloorStage) {
+      const cleanStage = incompleteFloorStage.name
+        .replace(/^\d+\.\s*Kat\s*/i, '')
+        .replace(/^Kat\s*\d+\s*-\s*/i, '')
+        .trim();
       return {
         isUnlocked: false,
-        reason: `Öncelikle ${parentFloor.name} yapısının "${incompleteFloorStage.name}" imalatı tamamlanmalıdır.`,
+        reason: `Öncelikle ${parentFloor.floor_number}. Kat yapısının "${cleanStage || incompleteFloorStage.name}" imalatı tamamlanmalıdır.`,
         prerequisiteName: incompleteFloorStage.name,
       };
     }
@@ -252,13 +245,18 @@ export function checkRoofStatus(project: Project): StageDependencyStatus {
   }
 
   if (project.floors && project.floors.length > 0) {
-    for (const floor of project.floors) {
+    const sortedFloors = [...project.floors].sort((a, b) => a.floor_number - b.floor_number);
+    for (const floor of sortedFloors) {
       if (floor.stages && floor.stages.length > 0) {
         const incompleteStage = floor.stages.find((s) => !s.is_completed);
         if (incompleteStage) {
+          const cleanStageName = incompleteStage.name
+            .replace(/^\d+\.\s*Kat\s*/i, '')
+            .replace(/^Kat\s*\d+\s*-\s*/i, '')
+            .trim();
           return {
             isUnlocked: false,
-            reason: `Çatı imalatı için önce ${floor.name} imalatı ("${incompleteStage.name}") tamamlanmalıdır.`,
+            reason: `Çatı imalatı için önce ${floor.floor_number}. Kat imalatı ("${cleanStageName || incompleteStage.name}") tamamlanmalıdır.`,
             prerequisiteName: incompleteStage.name,
           };
         }

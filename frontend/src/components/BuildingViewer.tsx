@@ -14,10 +14,10 @@ import {
   Store,
   Briefcase,
   Check,
-  RefreshCw,
-  Info,
   ChevronDown,
   ArrowDownUp,
+  PlusCircle,
+  Trash2,
 } from 'lucide-react';
 import { checkFloorStageStatus, checkUnitStageStatus, checkRoofStatus } from '../utils/stageDependencies';
 import { getEffectiveFloorUnits as getEffectiveFloorUnitsFromUtil } from '../utils/floorUtils';
@@ -168,15 +168,15 @@ export const isFloorMergedWithTopDuplex = (
 // En üst kat: dükkan, ofis, daire, dublex
 export const getAvailableTypologiesForFloor = (floorNumber: number, totalFloors: number): FloorTypology[] => {
   if (totalFloors <= 1) {
-    return ['commercial_shop', 'business_office', 'residential', 'reverse_duplex', 'duplex'];
+    return ['residential', 'duplex', 'commercial_shop', 'business_office', 'reverse_duplex'];
   }
   if (floorNumber === 1) {
-    return ['commercial_shop', 'business_office', 'residential', 'reverse_duplex'];
+    return ['commercial_shop', 'residential', 'business_office', 'reverse_duplex'];
   }
   if (floorNumber === totalFloors) {
-    return ['commercial_shop', 'business_office', 'residential', 'duplex'];
+    return ['residential', 'duplex', 'commercial_shop', 'business_office'];
   }
-  return ['commercial_shop', 'business_office', 'residential'];
+  return ['residential', 'commercial_shop', 'business_office'];
 };
 
 // =========================================================================
@@ -230,11 +230,10 @@ export const CustomTypologySelect: React.FC<CustomTypologySelectProps> = ({
             onOpen();
           }
         }}
-        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition cursor-pointer shadow-inner ${
-          isOpen
+        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition cursor-pointer shadow-inner ${isOpen
             ? 'border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/10'
             : 'border-amber-500/40 hover:border-amber-400 hover:bg-slate-900'
-        }`}
+          }`}
       >
         <div className="flex items-center gap-3 overflow-hidden">
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${selectedInfo.badgeStyle}`}>
@@ -243,17 +242,15 @@ export const CustomTypologySelect: React.FC<CustomTypologySelectProps> = ({
           <span className="font-bold text-amber-300 text-xs sm:text-sm text-left truncate leading-tight">{selectedInfo.label}</span>
         </div>
         <ChevronDown
-          className={`w-4 h-4 text-amber-400 transition-transform duration-200 shrink-0 ml-1.5 ${
-            isOpen ? 'rotate-180 text-amber-300' : ''
-          }`}
+          className={`w-4 h-4 text-amber-400 transition-transform duration-200 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-amber-300' : ''
+            }`}
         />
       </button>
 
       {isOpen && (
         <div
-          className={`absolute ${
-            isBottomFloor ? 'bottom-full mb-2.5' : 'top-full mt-2.5'
-          } left-0 right-0 w-full min-w-full sm:min-w-[300px] bg-slate-950/98 border-2 border-amber-500/60 rounded-2xl p-2 shadow-[0_15px_50px_rgba(0,0,0,0.9)] z-[100] space-y-1.5 backdrop-blur-2xl animate-fadeIn max-h-80 overflow-y-auto`}
+          className={`absolute ${isBottomFloor ? 'bottom-full mb-2.5' : 'top-full mt-2.5'
+            } left-0 right-0 w-full min-w-full sm:min-w-[300px] bg-slate-950/98 border-2 border-amber-500/60 rounded-2xl p-2 shadow-[0_15px_50px_rgba(0,0,0,0.9)] z-[100] space-y-1.5 backdrop-blur-2xl animate-fadeIn max-h-80 overflow-y-auto`}
         >
           {availableTypes.map((typeKey) => {
             const info = FLOOR_TYPOLOGY_MAP[typeKey];
@@ -268,19 +265,17 @@ export const CustomTypologySelect: React.FC<CustomTypologySelectProps> = ({
                   onChange(typeKey);
                   setIsOpen(false);
                 }}
-                className={`w-full p-2.5 rounded-xl text-left transition flex items-center justify-between cursor-pointer group ${
-                  isSelected
+                className={`w-full p-2.5 rounded-xl text-left transition flex items-center justify-between cursor-pointer group ${isSelected
                     ? 'bg-gradient-to-r from-amber-500/25 via-amber-500/15 to-slate-900 border border-amber-400/60 text-amber-300 font-extrabold shadow-lg shadow-amber-500/10'
                     : 'text-slate-200 hover:bg-slate-800/90 hover:text-amber-300 border border-transparent'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 transition ${
-                      isSelected
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 transition ${isSelected
                         ? `${info.badgeStyle} shadow-md`
                         : 'bg-slate-800 border-slate-700 text-slate-400 group-hover:text-amber-300 group-hover:border-amber-500/40'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-4 h-4" />
                   </div>
@@ -341,27 +336,24 @@ export const CustomUnitCountSelect: React.FC<CustomUnitCountSelectProps> = ({
             onOpen();
           }
         }}
-        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition cursor-pointer shadow-inner ${
-          isOpen
+        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition cursor-pointer shadow-inner ${isOpen
             ? 'border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/10'
             : 'border-slate-700 hover:border-slate-600 hover:bg-slate-900'
-        }`}
+          }`}
       >
         <span className="font-bold text-slate-200 text-xs sm:text-sm">
           {unitCount} Adet {unitPrefix}
         </span>
         <ChevronDown
-          className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-1.5 ${
-            isOpen ? 'rotate-180 text-amber-400' : ''
-          }`}
+          className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-1.5 ${isOpen ? 'rotate-180 text-amber-400' : ''
+            }`}
         />
       </button>
 
       {isOpen && (
         <div
-          className={`absolute ${
-            isBottomFloor ? 'bottom-full mb-2.5' : 'top-full mt-2.5'
-          } left-0 right-0 w-full min-w-full bg-slate-950/98 border-2 border-slate-700 rounded-2xl p-2 shadow-[0_15px_50px_rgba(0,0,0,0.9)] z-[100] space-y-1 backdrop-blur-2xl animate-fadeIn max-h-60 overflow-y-auto`}
+          className={`absolute ${isBottomFloor ? 'bottom-full mb-2.5' : 'top-full mt-2.5'
+            } left-0 right-0 w-full min-w-full bg-slate-950/98 border-2 border-slate-700 rounded-2xl p-2 shadow-[0_15px_50px_rgba(0,0,0,0.9)] z-[100] space-y-1 backdrop-blur-2xl animate-fadeIn max-h-60 overflow-y-auto`}
         >
           {OPTIONS.map((num) => {
             const isSelected = num === unitCount;
@@ -373,11 +365,10 @@ export const CustomUnitCountSelect: React.FC<CustomUnitCountSelectProps> = ({
                   onChange(num);
                   setIsOpen(false);
                 }}
-                className={`w-full px-3.5 py-2.5 rounded-xl text-left transition flex items-center justify-between cursor-pointer ${
-                  isSelected
+                className={`w-full px-3.5 py-2.5 rounded-xl text-left transition flex items-center justify-between cursor-pointer ${isSelected
                     ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300 font-extrabold shadow-sm'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
+                  }`}
               >
                 <span className="text-xs sm:text-sm font-semibold">
                   {num} Adet {unitPrefix}
@@ -416,7 +407,6 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   const storageKey = `golgeden_bina_ayarlari_${project?.id || 'default'}`;
   const roofStorageKey = `golgeden_roof_completed_${project?.id || 'default'}`;
@@ -437,12 +427,13 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
       const next = !prev;
       try {
         localStorage.setItem(settingsModeStorageKey, String(next));
-      } catch (e) {}
+      } catch (e) { }
       return next;
     });
   };
 
   const [floorTypologies, setFloorTypologies] = useState<Record<string, FloorTypologyConfig>>({});
+  const [newUnitsPerFloor, setNewUnitsPerFloor] = useState(2);
 
   const [isRoofMarkedManual, setIsRoofMarkedManual] = useState<boolean>(() => {
     try {
@@ -457,23 +448,55 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
   useEffect(() => {
     try {
       setIsRoofMarkedManual(localStorage.getItem(roofStorageKey) === 'true');
-    } catch (e) {}
+    } catch (e) { }
   }, [project?.id]);
+
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey);
+      let map: Record<string, FloorTypologyConfig> = {};
       if (saved) {
-        setFloorTypologies(JSON.parse(saved));
-      } else {
-        const initialMap: Record<string, FloorTypologyConfig> = {};
-        floors.forEach((f) => {
-          initialMap[f.id] = {
-            type: f.floor_number === 1 ? 'commercial_shop' : 'residential',
-            unitCount: f.units?.length || 3,
+        map = JSON.parse(saved);
+      }
+      let changed = false;
+      floors.forEach((f) => {
+        if (!map[f.id]) {
+          map[f.id] = {
+            type: f.floor_number === 1 ? 'commercial_shop' : f.floor_number === totalFloors ? 'duplex' : 'residential',
+            unitCount: f.units?.length || newUnitsPerFloor,
           };
-        });
-        setFloorTypologies(initialMap);
+          changed = true;
+        } else {
+          // If a middle floor has duplex, normalize it to residential
+          if (f.floor_number < totalFloors && map[f.id].type === 'duplex') {
+            map[f.id] = {
+              ...map[f.id],
+              type: 'residential',
+            };
+            changed = true;
+          }
+          // If a floor above Kat 1 has reverse_duplex, normalize to residential
+          if (f.floor_number > 1 && map[f.id].type === 'reverse_duplex') {
+            map[f.id] = {
+              ...map[f.id],
+              type: 'residential',
+            };
+            changed = true;
+          }
+        }
+      });
+      setFloorTypologies(map);
+      if (changed) {
+        localStorage.setItem(storageKey, JSON.stringify(map));
       }
     } catch (e) {
       console.error('Bina ayarları yüklenemedi:', e);
@@ -484,8 +507,6 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
     setFloorTypologies(newMap);
     try {
       localStorage.setItem(storageKey, JSON.stringify(newMap));
-      setSuccessToast('Kat ayarları güncellendi ve kaydedildi!');
-      setTimeout(() => setSuccessToast(null), 3000);
     } catch (e) {
       console.error('Bina ayarları kaydedilemedi:', e);
     }
@@ -513,8 +534,213 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
     }
   };
 
+  // Add a single floor above the selected floor (or at the top if none selected)
+  const handleAddFloorAbove = () => {
+    if (!project || !onUpdateProject) return;
+    const projectId = project.id;
+    const ts = Date.now();
+
+    // Determine insertion point: above selected floor, or at top
+    const selectedFloor = floors.find((f) => f.id === selectedFloorId);
+    const insertAboveNum = selectedFloor ? selectedFloor.floor_number : (floors.length > 0 ? Math.max(...floors.map(f => f.floor_number)) : 0);
+
+    const oldTopFloor = floors.find((f) => f.floor_number === floors.length);
+    const wasTopDuplex = oldTopFloor && ((floorTypologies[oldTopFloor.id]?.type) === 'duplex');
+
+    // Shift all floors above the insertion point up by 1
+    const shiftedFloors = floors.map((f) => {
+      if (f.floor_number > insertAboveNum) {
+        const nextNum = f.floor_number + 1;
+        return {
+          ...f,
+          floor_number: nextNum,
+          name: `${nextNum}. Kat`,
+          stages: f.stages?.map((s) => ({
+            ...s,
+            name: s.name.replace(/^\d+\.\s*Kat/i, `${nextNum}. Kat`),
+          })),
+        };
+      }
+      return f;
+    });
+
+    const newFloorNum = insertAboveNum + 1;
+    const newFloorId = `floor-${newFloorNum}-${projectId}-${ts}`;
+    const units = Array.from({ length: newUnitsPerFloor }, (_, uIdx) => {
+      const unitNum = newFloorNum * 100 + (uIdx + 1);
+      const unitId = `unit-${unitNum}-${projectId}-${ts + uIdx}`;
+      return {
+        id: unitId,
+        floor_id: newFloorId,
+        unit_number: unitNum,
+        name: `Daire ${unitNum}`,
+        is_completed: false,
+        stages: [
+          {
+            id: `st-u-${unitNum}-1-${ts}`,
+            project_id: projectId,
+            floor_id: newFloorId,
+            unit_id: unitId,
+            name: 'Sıva, Şap & Seramik Kaplama',
+            category: 'ince_isler',
+            estimated_cost: (project.total_budget * 0.3) / Math.max(1, floors.length + 1) / Math.max(1, newUnitsPerFloor),
+            actual_cost: 0,
+            weight_percentage: 50,
+            is_completed: false,
+            order_index: 1,
+          },
+          {
+            id: `st-u-${unitNum}-2-${ts}`,
+            project_id: projectId,
+            floor_id: newFloorId,
+            unit_id: unitId,
+            name: 'Boya, Aydınlatma & Armatür Montajı',
+            category: 'ince_isler',
+            estimated_cost: (project.total_budget * 0.2) / Math.max(1, floors.length + 1) / Math.max(1, newUnitsPerFloor),
+            actual_cost: 0,
+            weight_percentage: 50,
+            is_completed: false,
+            order_index: 2,
+          },
+        ],
+      };
+    });
+
+    const newFloor = {
+      id: newFloorId,
+      project_id: projectId,
+      floor_number: newFloorNum,
+      name: `${newFloorNum}. Kat`,
+      is_completed: false,
+      units,
+      stages: [
+        {
+          id: `st-f-${newFloorNum}-1-${ts}`,
+          project_id: projectId,
+          floor_id: newFloorId,
+          name: `${newFloorNum}. Kat Kolon & Betonarme`,
+          category: 'labor',
+          estimated_cost: (project.total_budget * 0.3) / Math.max(1, floors.length + 1),
+          actual_cost: 0,
+          weight_percentage: 8,
+          is_completed: false,
+          order_index: 1,
+        },
+        {
+          id: `st-f-${newFloorNum}-2-${ts}`,
+          project_id: projectId,
+          floor_id: newFloorId,
+          name: `${newFloorNum}. Kat Tuğla Duvar Örme & Bölmeler`,
+          category: 'labor',
+          estimated_cost: (project.total_budget * 0.2) / Math.max(1, floors.length + 1),
+          actual_cost: 0,
+          weight_percentage: 6,
+          is_completed: false,
+          order_index: 2,
+        },
+      ],
+    };
+
+    const merged = [...shiftedFloors, newFloor].sort((a, b) => b.floor_number - a.floor_number);
+
+    const newTypoMap: Record<string, FloorTypologyConfig> = { ...floorTypologies };
+
+    // If the top floor was previously a duplex and we added a new floor at the top,
+    // transfer the duplex to the new top floor and set old top floor to residential.
+    if (wasTopDuplex && newFloorNum > (oldTopFloor?.floor_number || 0)) {
+      if (oldTopFloor) {
+        newTypoMap[oldTopFloor.id] = {
+          ...newTypoMap[oldTopFloor.id],
+          type: 'residential',
+          unitCount: newTypoMap[oldTopFloor.id]?.unitCount || newUnitsPerFloor,
+        };
+      }
+      newTypoMap[newFloorId] = {
+        type: 'duplex',
+        unitCount: floorTypologies[oldTopFloor!.id]?.unitCount || newUnitsPerFloor,
+      };
+    } else {
+      newTypoMap[newFloorId] = {
+        type: newFloorNum === 1 ? 'commercial_shop' : 'residential',
+        unitCount: newUnitsPerFloor,
+      };
+    }
+
+    setFloorTypologies(newTypoMap);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(newTypoMap));
+    } catch (e) {}
+
+    onUpdateProject({
+      ...project,
+      floors: merged,
+      unit_count: merged.reduce((sum, f) => {
+        const typo = newTypoMap[f.id] || getFloorTypology(f.id);
+        return sum + (typo.unitCount ?? (f.units?.length || newUnitsPerFloor));
+      }, 0),
+      description: `${merged.length} Katlı İnşaat Projesi`,
+    });
+    setSelectedFloorId(newFloorId);
+  };
+
+  // Delete the currently selected floor
+  const handleDeleteSelectedFloor = () => {
+    if (!project || !onUpdateProject || !selectedFloorId) return;
+    const target = floors.find((f) => f.id === selectedFloorId);
+    if (!target) return;
+    const deletedNum = target.floor_number;
+
+    // Remove it and renumber the ones above
+    const remaining = floors
+      .filter((f) => f.id !== selectedFloorId)
+      .map((f) => {
+        if (f.floor_number > deletedNum) {
+          const nextNum = f.floor_number - 1;
+          return {
+            ...f,
+            floor_number: nextNum,
+            name: `${nextNum}. Kat`,
+            stages: f.stages?.map((s) => ({
+              ...s,
+              name: s.name.replace(/^\d+\.\s*Kat/i, `${nextNum}. Kat`),
+            })),
+          };
+        }
+        return f;
+      })
+      .sort((a, b) => b.floor_number - a.floor_number);
+
+    const updatedTypologies = { ...floorTypologies };
+    delete updatedTypologies[selectedFloorId];
+    setFloorTypologies(updatedTypologies);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(updatedTypologies));
+    } catch (e) {}
+
+    onUpdateProject({
+      ...project,
+      floors: remaining,
+      unit_count: remaining.reduce((sum, f) => sum + (f.units?.length || 0), 0),
+      description: remaining.length > 0 ? `${remaining.length} Katlı İnşaat Projesi` : 'Yeni Başlanan İnşaat Projesi',
+    });
+    // Auto-select: prefer the floor above (which now has floor_number === deletedNum), else the floor below (deletedNum - 1)
+    const nextFloor =
+      remaining.find((f) => f.floor_number === deletedNum) ??
+      remaining.find((f) => f.floor_number === deletedNum - 1) ??
+      remaining[0] ??
+      null;
+    setSelectedFloorId(nextFloor?.id ?? null);
+  };
+
   const getFloorTypology = (floorId: string): FloorTypologyConfig => {
-    return floorTypologies[floorId] || { type: 'residential', unitCount: 3 };
+    const floor = floors.find((f) => f.id === floorId);
+    if (floorTypologies[floorId]) {
+      return floorTypologies[floorId];
+    }
+    return {
+      type: floor?.floor_number === 1 ? 'commercial_shop' : 'residential',
+      unitCount: floor?.units?.length || newUnitsPerFloor,
+    };
   };
 
   const getEffectiveFloorUnits = (floor: BuildingFloor): Unit[] => {
@@ -532,7 +758,7 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
 
     const typoConfig = getFloorTypology(floor.id);
     const typoInfo = FLOOR_TYPOLOGY_MAP[typoConfig.type] || FLOOR_TYPOLOGY_MAP['residential'];
-    const targetCount = typoConfig.unitCount ?? (floor.units?.length || 3);
+    const targetCount = typoConfig.unitCount ?? (floor.units?.length || newUnitsPerFloor);
     const existingUnits = floor.units || [];
 
     const isTopDuplexUpper = floor.floor_number === totalFloors && typoConfig.type === 'duplex' && totalFloors > 1;
@@ -626,10 +852,36 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
     return Math.round((completedItems / totalItems) * 100);
   };
 
+  const getFloorEffectiveStages = (floor: BuildingFloor) => {
+    const rawStages = floor.stages || [];
+    if (rawStages.length === 0) return [];
+    const hasWallStage = rawStages.some(
+      (s) => s.name.toLowerCase().includes('duvar') || s.name.toLowerCase().includes('bölme')
+    );
+    if (!hasWallStage && rawStages.length === 1) {
+      const firstStage = rawStages[0];
+      const wallStage = {
+        id: `${firstStage.id}-duvar`,
+        project_id: firstStage.project_id,
+        floor_id: floor.id,
+        name: `${floor.floor_number}. Kat Tuğla Duvar Örme & Bölmeler`,
+        category: 'labor',
+        estimated_cost: Math.round((firstStage.estimated_cost || 1000000) * 0.65),
+        actual_cost: 0,
+        weight_percentage: 6,
+        is_completed: false,
+        order_index: 2,
+      };
+      return [firstStage, wallStage];
+    }
+    return rawStages;
+  };
+
   const renderFloorInspectionPanel = (floor: BuildingFloor) => {
     const typoInfo =
       FLOOR_TYPOLOGY_MAP[getFloorTypology(floor.id).type] || FLOOR_TYPOLOGY_MAP['residential'];
     const floorUnits = getEffectiveFloorUnits(floor);
+    const effectiveFloorStages = getFloorEffectiveStages(floor);
 
     return (
       <div
@@ -652,16 +904,14 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
           </div>
         )}
 
-
-
         {/* Floor Level Stage Toggles */}
-        {floor.stages && floor.stages.length > 0 && (
+        {effectiveFloorStages.length > 0 && (
           <div>
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               Katın Yapısal İmalat Aşamaları
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {floor.stages.map((stage) => {
+              {effectiveFloorStages.map((stage) => {
                 const depStatus = project
                   ? checkFloorStageStatus(project, floor.id, stage.id)
                   : { isUnlocked: true };
@@ -681,23 +931,21 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                   <div
                     key={stage.id}
                     onClick={handleStageClick}
-                    className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-all ${
-                      isLocked
+                    className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-all ${isLocked
                         ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
                         : stage.is_completed
-                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60'
-                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 cursor-pointer hover:border-amber-500/60'
-                    }`}
+                          ? 'bg-amber-500/10 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60'
+                          : 'bg-slate-800/40 border-slate-700/60 text-slate-400 cursor-pointer hover:border-amber-500/60'
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <span
-                        className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 ${
-                          isLocked
+                        className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 ${isLocked
                             ? 'border-slate-700 bg-slate-900/50 text-slate-600 cursor-not-allowed'
                             : stage.is_completed
-                            ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
-                            : 'border-slate-600 bg-slate-900 hover:border-amber-400 cursor-pointer'
-                        }`}
+                              ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
+                              : 'border-slate-600 bg-slate-900 hover:border-amber-400 cursor-pointer'
+                          }`}
                       >
                         {stage.is_completed ? (
                           <CheckCircle2 key="chk-completed" className="w-4 h-4 stroke-[3]" />
@@ -725,22 +973,18 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                     </div>
 
                     <span
-                      className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 shrink-0 ${
-                        isLocked
-                          ? 'bg-slate-900 text-rose-400 border border-rose-500/30'
+                      className={`text-xs px-2.5 py-1 rounded-full font-bold inline-flex items-center gap-1 shrink-0 ${isLocked
+                          ? 'bg-slate-900 text-rose-400 border border-rose-500/30 text-[10px]'
                           : stage.is_completed
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                          : 'bg-slate-800 text-slate-400 border border-slate-700'
-                      }`}
+                            ? 'bg-amber-400 text-slate-950 font-black border border-yellow-200'
+                            : 'bg-slate-900 text-slate-400 border border-slate-700'
+                        }`}
                     >
-                      {isLocked && <Lock className="w-2.5 h-2.5 shrink-0" />}
-                      <span>
-                        {isLocked
-                          ? 'Kilitli'
-                          : stage.is_completed
+                      {isLocked
+                        ? 'Kilitli'
+                        : stage.is_completed
                           ? 'Tamamlandı'
-                          : 'Bekliyor'}
-                      </span>
+                          : 'Gölge'}
                     </span>
                   </div>
                 );
@@ -770,10 +1014,9 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                   onClick={() => setSelectedUnitId(isUnitSelected ? null : unit.id)}
                   className={`
                     p-4 rounded-xl border cursor-pointer transition-all duration-300 relative overflow-hidden group
-                    ${
-                      unit.is_completed
-                        ? 'bg-amber-500/10 border-amber-500/50 hover:bg-amber-500/20'
-                        : 'bg-slate-800/50 border-slate-700/80 opacity-70 hover:opacity-100'
+                    ${unit.is_completed
+                      ? 'bg-amber-500/10 border-amber-500/50 hover:bg-amber-500/20'
+                      : 'bg-slate-800/50 border-slate-700/80 opacity-70 hover:opacity-100'
                     }
                     ${isUnitSelected ? 'ring-2 ring-amber-400 shadow-lg' : ''}
                   `}
@@ -783,11 +1026,10 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                       {unit.name}
                     </span>
                     <span
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        unit.is_completed
+                      className={`w-2.5 h-2.5 rounded-full ${unit.is_completed
                           ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]'
                           : 'bg-slate-600'
-                      }`}
+                        }`}
                     />
                   </div>
 
@@ -835,23 +1077,21 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                     <div
                       key={st.id}
                       onClick={handleUnitStageClick}
-                      className={`flex items-center justify-between text-xs p-2.5 rounded-lg border transition-all ${
-                        isUnitStLocked
+                      className={`flex items-center justify-between text-xs p-2.5 rounded-lg border transition-all ${isUnitStLocked
                           ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
                           : st.is_completed
-                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
-                      }`}
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
+                        }`}
                     >
                       <div className="flex items-center gap-2">
                         <span
-                          className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
-                            isUnitStLocked
+                          className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${isUnitStLocked
                               ? 'border-slate-700 bg-slate-950 text-slate-600 cursor-not-allowed'
                               : st.is_completed
-                              ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
-                              : 'border-slate-600 cursor-pointer'
-                          }`}
+                                ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
+                                : 'border-slate-600 cursor-pointer'
+                            }`}
                         >
                           {st.is_completed ? (
                             <CheckCircle2 key="uchk-completed" className="w-3 h-3 stroke-[3]" />
@@ -914,53 +1154,146 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
         {/* TOP RIGHT: Building Settings Toggle Button */}
         <button
           onClick={toggleSettingsMode}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg cursor-pointer backdrop-blur-md shrink-0 border ${
-            isSettingsMode
-              ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-amber-500/30 font-extrabold'
-              : 'bg-slate-900 border-slate-700 text-amber-300 hover:border-amber-500/50'
-          }`}
-        >
-          <SlidersHorizontal className={`w-4 h-4 ${isSettingsMode ? 'text-slate-950' : 'text-amber-400'}`} />
-          <span>Kat & Bina Yapı Ayarları</span>
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ml-1 ${
-              isSettingsMode
-                ? 'bg-slate-950/20 text-slate-950 border border-slate-950/30'
-                : 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg cursor-pointer backdrop-blur-md shrink-0 border ${isSettingsMode
+              ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 border-amber-300 text-slate-950 shadow-amber-500/30 font-black'
+              : 'bg-slate-900 border-slate-700 text-amber-300 hover:border-amber-500/50 hover:bg-slate-800'
             }`}
-          >
-            {isSettingsMode ? 'Ayarlar Açık' : 'Ayarları Göster'}
-          </span>
+        >
+          {isSettingsMode ? (
+            <>
+              <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
+              <span>Ayarları Kapat</span>
+            </>
+          ) : (
+            <>
+              <SlidersHorizontal className="w-4 h-4 text-amber-400" />
+              <span>Bina Ayarları</span>
+            </>
+          )}
         </button>
       </div>
 
-      {/* Success Notification Banner */}
-      {successToast && (
-        <div className="mb-6 p-3 bg-emerald-500/20 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 text-xs animate-fadeIn">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>{successToast}</span>
-          </div>
-          <button onClick={() => setSuccessToast(null)} className="text-emerald-400 hover:text-white font-bold cursor-pointer">
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Quick Info Bar when Settings Mode is ON */}
-      {isSettingsMode && (
-        <div className="mb-6 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-200 flex items-center gap-2 animate-fadeIn">
-          <Info className="w-4 h-4 text-amber-400 shrink-0" />
-          <span>
-            Her katın kullanım amacını (Dükkan, Ofis, Daire, Ters Dubleks, Dubleks) ve birim sayısını <strong>doğrudan o katın sağındaki menülerden</strong> düzenleyebilirsiniz.
-          </span>
-        </div>
-      )}
-
       {/* Main Building Stack View */}
       <div className="w-full max-w-5xl mx-auto flex flex-col items-center">
-        {/* Roof Architecture Graphic (Only visible when Settings Mode is OFF) */}
-        {!isSettingsMode && (
+        {/* Toast Warning Alert Notification */}
+        {toastMessage && (
+          <div className="w-full mb-4 p-3.5 bg-rose-500/20 border border-rose-500/50 rounded-2xl flex items-center justify-between text-rose-200 text-xs sm:text-sm font-medium animate-shake shadow-lg shadow-rose-950/40 backdrop-blur-md">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+              <span>{toastMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToastMessage(null)}
+              className="text-rose-400 font-bold hover:text-white ml-2 text-base cursor-pointer p-1 rounded-lg hover:bg-rose-500/20 transition"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Top Settings Toolbar — placed at the TOP so adding/removing floors never pushes controls downwards */}
+        {isSettingsMode && (
+          <div className="w-full mb-6 animate-fadeIn">
+            {/* Stats pill */}
+            <div className="w-full flex items-center justify-between mb-3 px-1">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-1.5 shadow-sm">
+                  <Layers className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs font-black text-amber-400">{floors.length} kat</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-1.5 shadow-sm">
+                  <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs font-black text-amber-400">
+                    {floors.reduce((s, f) => s + (f.units?.length || 0), 0)} mülkiyet
+                  </span>
+                </div>
+                {selectedFloorId && (() => {
+                  const sf = floors.find(f => f.id === selectedFloorId);
+                  return sf ? (
+                    <div className="flex items-center gap-1.5 bg-amber-500/15 border border-amber-500/30 rounded-xl px-3 py-1.5 shadow-sm">
+                      <span className="text-xs font-black text-amber-300">Seçili: {sf.floor_number}. Kat</span>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            </div>
+
+            {/* Main full-width horizontal toolbar */}
+            <div className="w-full flex flex-col sm:flex-row items-stretch gap-3 bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 sm:p-4 shadow-xl backdrop-blur-md">
+
+              {/* Units per floor stepper */}
+              <div className="flex flex-row sm:flex-col justify-center items-center px-4 py-2 bg-slate-950/60 sm:bg-transparent rounded-xl sm:rounded-none border border-slate-800 sm:border-0 sm:border-r sm:border-slate-700/80 shrink-0 gap-3 sm:gap-1.5">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Kat Başı Daire</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewUnitsPerFloor((v) => Math.max(1, v - 1))}
+                    className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-bold text-base flex items-center justify-center hover:border-amber-500 hover:text-amber-300 active:scale-90 transition cursor-pointer"
+                  >−</button>
+                  <div className="w-8 text-center">
+                    <span className="text-xl font-black text-amber-400">{newUnitsPerFloor}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNewUnitsPerFloor((v) => Math.min(4, v + 1))}
+                    className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-bold text-base flex items-center justify-center hover:border-amber-500 hover:text-amber-300 active:scale-90 transition cursor-pointer"
+                  >+</button>
+                </div>
+              </div>
+
+              {/* Add floor button */}
+              <button
+                type="button"
+                onClick={handleAddFloorAbove}
+                disabled={!onUpdateProject}
+                className="flex-1 flex flex-row items-center justify-center gap-3 py-3.5 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm transition shadow-lg shadow-amber-500/20 active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <PlusCircle className="w-5 h-5 shrink-0" />
+                <div className="text-left">
+                  <div className="text-xs sm:text-sm font-extrabold leading-tight">
+                    {selectedFloorId && floors.find(f => f.id === selectedFloorId)
+                      ? `${floors.find(f => f.id === selectedFloorId)!.floor_number + 1}. Kat Ekle`
+                      : 'Yeni Kat Ekle'
+                    }
+                  </div>
+                  {selectedFloorId && floors.find(f => f.id === selectedFloorId) && (
+                    <div className="text-[10px] font-semibold opacity-80">
+                      {floors.find(f => f.id === selectedFloorId)!.floor_number}. katın üstüne ekler
+                    </div>
+                  )}
+                </div>
+              </button>
+
+              {/* Delete selected floor button */}
+              <button
+                type="button"
+                onClick={handleDeleteSelectedFloor}
+                disabled={!onUpdateProject || !selectedFloorId}
+                className="flex-1 flex flex-row items-center justify-center gap-3 py-3.5 px-5 rounded-xl border transition active:scale-[0.98] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed
+                    bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20 hover:border-rose-500/50"
+              >
+                <Trash2 className="w-5 h-5 shrink-0 text-rose-400" />
+                <div className="text-left">
+                  <div className="text-xs sm:text-sm font-bold leading-tight">
+                    {selectedFloorId && floors.find(f => f.id === selectedFloorId)
+                      ? `${floors.find(f => f.id === selectedFloorId)!.floor_number}. Katı Sil`
+                      : 'Kat Seç'}
+                  </div>
+                  {!selectedFloorId ? (
+                    <div className="text-[10px] font-normal opacity-60">silmek için kat seçin</div>
+                  ) : (
+                    <div className="text-[10px] font-normal opacity-70">seçili katı kaldırır</div>
+                  )}
+                </div>
+              </button>
+
+            </div>
+          </div>
+        )}
+
+        {/* Roof Architecture Graphic (Only visible when Settings Mode is OFF and floors exist) */}
+        {!isSettingsMode && floors.length > 0 && (
           <div
             onClick={() => {
               if (!isContractor) return;
@@ -973,10 +1306,7 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
               setIsRoofMarkedManual(nextState);
               try {
                 localStorage.setItem(roofStorageKey, String(nextState));
-              } catch (e) {}
-
-              setSuccessToast(nextState ? 'Çatı & yalıtım imalatı tamamlandı olarak kaydedildi!' : 'Çatı imalat durumu güncellendi.');
-              setTimeout(() => setSuccessToast(null), 3000);
+              } catch (e) { }
 
               if (project && onUpdateProject) {
                 onUpdateProject({ ...project });
@@ -985,26 +1315,20 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
             className="w-full relative mb-2 cursor-pointer group"
           >
             <div
-              className={`w-full h-16 rounded-t-3xl border-t-2 border-x-2 transition-all duration-700 flex items-center justify-between px-6 relative overflow-hidden group-hover:border-amber-400 ${
-                isRoofDone
+              className={`w-full h-16 rounded-t-3xl border-t-2 border-x-2 transition-all duration-700 flex items-center justify-between px-6 relative overflow-hidden group-hover:border-amber-400 ${isRoofDone
                   ? 'bg-gradient-to-b from-amber-500 via-amber-600 to-amber-950 border-amber-400 shadow-[0_-5px_25px_rgba(245,158,11,0.5)]'
                   : 'bg-slate-900/80 border-slate-800 border-dashed opacity-75 hover:opacity-100'
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3 z-10">
                 <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${
-                    isRoofDone
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-all ${isRoofDone
                       ? 'bg-amber-400 border-yellow-200 text-slate-950 shadow-md'
-                      : !roofDep.isUnlocked
-                      ? 'border-slate-700 bg-slate-900/60 text-slate-600'
                       : 'border-slate-600 bg-slate-900 text-slate-400 group-hover:border-amber-400'
-                  }`}
+                    }`}
                 >
                   {isRoofDone ? (
                     <CheckCircle2 className="w-5 h-5 stroke-[3]" />
-                  ) : !roofDep.isUnlocked ? (
-                    <Lock className="w-4 h-4 text-slate-500" />
                   ) : (
                     <Home className="w-4 h-4 text-amber-400" />
                   )}
@@ -1023,20 +1347,12 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
               {/* Right Side Status Pill */}
               <div className="z-10 flex items-center gap-2">
                 <span
-                  className={`text-xs px-3 py-1 rounded-full font-bold inline-flex items-center gap-1.5 transition-all ${
-                    !roofDep.isUnlocked
-                      ? 'bg-slate-900 text-rose-400 border border-rose-500/30'
-                      : isRoofDone
+                  className={`text-xs px-3 py-1 rounded-full font-bold inline-flex items-center gap-1.5 transition-all ${isRoofDone
                       ? 'bg-amber-400 text-slate-950 font-black border border-yellow-200 shadow-lg shadow-amber-500/30'
                       : 'bg-slate-800 text-amber-300 border border-slate-700 group-hover:border-amber-500/50'
-                  }`}
+                    }`}
                 >
-                  {!roofDep.isUnlocked ? (
-                    <>
-                      <Lock className="w-3 h-3 shrink-0" />
-                      <span>Kilitli (Ön Koşul)</span>
-                    </>
-                  ) : isRoofDone ? (
+                  {isRoofDone ? (
                     <>
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0 stroke-[3]" />
                       <span>Tamamlandı ✓</span>
@@ -1055,199 +1371,32 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
 
         {/* Floor Stack List - Each Floor Row Contains its OWN Settings Controls directly on its Right Side! */}
         <div className="w-full space-y-3 relative">
-            {filteredFloors.length > 0 ? (
-              [...filteredFloors]
-                .sort((a, b) => b.floor_number - a.floor_number)
-                .map((floor) => {
-                  const topFloor = floors.find((f) => f.floor_number === totalFloors);
-                  const isTopDuplex = topFloor && getFloorTypology(topFloor.id).type === 'duplex';
+          {filteredFloors.length > 0 ? (
+            [...filteredFloors]
+              .sort((a, b) => b.floor_number - a.floor_number)
+              .map((floor) => {
+                const topFloor = floors.find((f) => f.floor_number === totalFloors);
+                const isTopDuplex = topFloor && getFloorTypology(topFloor.id).type === 'duplex';
 
-                  // If this floor is Kat 5 (totalFloors - 1) and top floor (Kat 6) is duplex, skip it (it is merged into Kat 6 single thick box)
-                  if (isTopDuplex && floor.floor_number === totalFloors - 1 && totalFloors > 1) {
-                    return null;
-                  }
+                // If this floor is Kat 5 (totalFloors - 1) and top floor (Kat 6) is duplex, skip it (it is merged into Kat 6 single thick box)
+                if (isTopDuplex && floor.floor_number === totalFloors - 1 && totalFloors > 1) {
+                  return null;
+                }
 
-                  const isDuplexMergedBox = isTopDuplex && floor.floor_number === totalFloors && totalFloors > 1;
-                  const isSelected = selectedFloorId === floor.id;
-                  const progress = calculateFloorProgress(floor);
-                  const isFullyDone = progress === 100;
-                  const currentTypo = getFloorTypology(floor.id);
-                  const availableTypes = getAvailableTypologiesForFloor(floor.floor_number, totalFloors);
-                  const effectiveTypeKey = availableTypes.includes(currentTypo.type)
-                    ? currentTypo.type
-                    : availableTypes[0];
-                  const typoInfo = FLOOR_TYPOLOGY_MAP[effectiveTypeKey] || FLOOR_TYPOLOGY_MAP['residential'];
-                  const TypoIcon = typoInfo.icon;
-                  const effectiveUnits = getEffectiveFloorUnits(floor);
+                const isDuplexMergedBox = isTopDuplex && floor.floor_number === totalFloors && totalFloors > 1;
+                const isSelected = selectedFloorId === floor.id;
+                const progress = calculateFloorProgress(floor);
+                const isFullyDone = progress === 100;
+                const currentTypo = getFloorTypology(floor.id);
+                const availableTypes = getAvailableTypologiesForFloor(floor.floor_number, totalFloors);
+                const effectiveTypeKey = availableTypes.includes(currentTypo.type)
+                  ? currentTypo.type
+                  : availableTypes[0];
+                const typoInfo = FLOOR_TYPOLOGY_MAP[effectiveTypeKey] || FLOOR_TYPOLOGY_MAP['residential'];
+                const TypoIcon = typoInfo.icon;
+                const effectiveUnits = getEffectiveFloorUnits(floor);
 
-                  if (isDuplexMergedBox) {
-                    return (
-                      <div
-                        key={floor.id}
-                        style={{ zIndex: isSelected ? 100 : floor.floor_number * 10 }}
-                        onClick={() => {
-                          setSelectedFloorId(isSelected ? null : floor.id);
-                          setSelectedUnitId(null);
-                        }}
-                        className={`
-                          relative cursor-pointer transition-all duration-300 rounded-2xl border p-5 sm:p-6 group
-                          ${
-                            isSelected
-                              ? 'scale-[1.01] ring-2 ring-amber-400/80 border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
-                              : 'hover:scale-[1.005]'
-                          }
-                          ${
-                            isFullyDone
-                              ? `${typoInfo.badgeStyle} bg-gradient-to-r ${typoInfo.bgGradient}`
-                              : 'bg-slate-900/75 border-slate-800 hover:border-slate-700 backdrop-blur-md'
-                          }
-                        `}
-                      >
-                        {/* Left Column Accent Bar */}
-                        <div
-                          className={`absolute top-0 left-0 bottom-0 w-2 rounded-l-2xl transition-all duration-500 ${
-                            isFullyDone
-                              ? 'bg-gradient-to-b from-amber-400 to-yellow-500 shadow-[0_0_14px_rgba(245,158,11,0.9)]'
-                              : typoInfo.barColor
-                          }`}
-                        />
-
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pl-2">
-                          {/* Floor Left Visual Information */}
-                          <div className="flex items-center gap-4 lg:w-5/12">
-                            <div
-                              className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm transition-all duration-300 shrink-0 ${
-                                isSelected
-                                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/50'
-                                  : 'bg-slate-800 text-slate-300 group-hover:text-white'
-                              }`}
-                            >
-                              {totalFloors}-{totalFloors - 1}.K
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-bold text-white group-hover:text-amber-300 transition-colors text-base">
-                                  Kat {totalFloors} & Kat {totalFloors - 1}
-                                </h3>
-
-                                <span
-                                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 ${typoInfo.badgeStyle}`}
-                                >
-                                  <TypoIcon className="w-3.5 h-3.5" />
-                                  <span>{typoInfo.shortBadge} ({effectiveUnits.length} Birim)</span>
-                                </span>
-                              </div>
-
-                              {/* Units Preview Blocks */}
-                              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                                {effectiveUnits.map((u) => (
-                                  <span
-                                    key={u.id}
-                                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border transition-all ${
-                                      u.is_completed
-                                        ? 'bg-amber-500/20 border-amber-400/60 text-amber-200 shadow-sm'
-                                        : 'bg-slate-950/80 border-slate-800 text-slate-400'
-                                    }`}
-                                  >
-                                    {u.name} {u.is_completed ? '✓' : ''}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* RIGHT SIDE OF THIS EXACT SAME FLOOR ROW: SETTINGS CONTROLS OR PROGRESS */}
-                          {isSettingsMode ? (
-                            <div
-                              className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80 lg:border-l lg:pl-6 lg:w-7/12 shrink-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {/* Custom Typology Select */}
-                              <div>
-                                <label className="block text-xs font-bold text-amber-400/90 uppercase tracking-wider mb-1.5">
-                                  Kat Kullanım Amacı:
-                                </label>
-                                <CustomTypologySelect
-                                  value={effectiveTypeKey}
-                                  floorNumber={floor.floor_number}
-                                  totalFloors={totalFloors}
-                                  onOpen={() => setSelectedFloorId(floor.id)}
-                                  onChange={(newType) => {
-                                    setSelectedFloorId(floor.id);
-                                    const updated = {
-                                      ...floorTypologies,
-                                      [floor.id]: {
-                                        ...currentTypo,
-                                        type: newType,
-                                      },
-                                    };
-                                    saveTypologies(updated);
-                                  }}
-                                />
-                              </div>
-
-                              {/* Custom Unit Count Select */}
-                              <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                                  Kattaki Dubleks Sayısı:
-                                </label>
-                                <CustomUnitCountSelect
-                                  unitCount={currentTypo.unitCount ?? (floor.units?.length || 3)}
-                                  unitPrefix={typoInfo.unitPrefix}
-                                  floorNumber={floor.floor_number}
-                                  onOpen={() => setSelectedFloorId(floor.id)}
-                                  onChange={(count) => {
-                                    setSelectedFloorId(floor.id);
-                                    const updated = {
-                                      ...floorTypologies,
-                                      [floor.id]: {
-                                        ...currentTypo,
-                                        type: effectiveTypeKey,
-                                        unitCount: count,
-                                      },
-                                    };
-                                    saveTypologies(updated);
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-4">
-                              <div className="text-right hidden sm:block">
-                                <div className="text-xs font-semibold text-white">%{progress}</div>
-                                <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                                  <div
-                                    className={`h-full transition-all duration-700 ${
-                                      isFullyDone ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]' : 'bg-slate-600'
-                                    }`}
-                                    style={{ width: `${progress}%` }}
-                                  />
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedFloorId(isSelected ? null : floor.id);
-                                  setSelectedUnitId(null);
-                                }}
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                                  isSelected
-                                    ? 'bg-amber-500 text-slate-950 shadow-md'
-                                    : 'bg-slate-800/80 text-slate-400 group-hover:bg-slate-700 group-hover:text-white'
-                                }`}
-                              >
-                                <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'rotate-90 text-slate-950' : ''}`} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        {isSelected && !isSettingsMode && renderFloorInspectionPanel(floor)}
-                      </div>
-                    );
-                  }
-
+                if (isDuplexMergedBox) {
                   return (
                     <div
                       key={floor.id}
@@ -1257,45 +1406,41 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                         setSelectedUnitId(null);
                       }}
                       className={`
-                        relative cursor-pointer transition-all duration-300 rounded-2xl border p-5 sm:p-6 group
-                        ${
-                          isSelected
-                            ? 'scale-[1.01] ring-2 ring-amber-400/80 border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
-                            : 'hover:scale-[1.005]'
+                          relative cursor-pointer transition-all duration-300 rounded-2xl border p-5 sm:p-6 group
+                          ${isSelected
+                          ? 'scale-[1.01] ring-2 ring-amber-400/80 border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
+                          : 'hover:scale-[1.005]'
                         }
-                        ${
-                          isFullyDone
-                            ? `${typoInfo.badgeStyle} bg-gradient-to-r ${typoInfo.bgGradient}`
-                            : 'bg-slate-900/75 border-slate-800 hover:border-slate-700 backdrop-blur-md'
+                          ${isFullyDone
+                          ? `${typoInfo.badgeStyle} bg-gradient-to-r ${typoInfo.bgGradient}`
+                          : 'bg-slate-900/75 border-slate-800 hover:border-slate-700 backdrop-blur-md'
                         }
-                      `}
+                        `}
                     >
                       {/* Left Column Accent Bar */}
                       <div
-                        className={`absolute top-0 left-0 bottom-0 w-2 rounded-l-2xl transition-all duration-500 ${
-                          isFullyDone
+                        className={`absolute top-0 left-0 bottom-0 w-2 rounded-l-2xl transition-all duration-500 ${isFullyDone
                             ? 'bg-gradient-to-b from-amber-400 to-yellow-500 shadow-[0_0_14px_rgba(245,158,11,0.9)]'
                             : typoInfo.barColor
-                        }`}
+                          }`}
                       />
 
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pl-2">
                         {/* Floor Left Visual Information */}
                         <div className="flex items-center gap-4 lg:w-5/12">
                           <div
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm transition-all duration-300 shrink-0 ${
-                              isSelected
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm transition-all duration-300 shrink-0 ${isSelected
                                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/50'
                                 : 'bg-slate-800 text-slate-300 group-hover:text-white'
-                            }`}
+                              }`}
                           >
-                            {floor.floor_number}.K
+                            {totalFloors}-{totalFloors - 1}.K
                           </div>
 
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-bold text-white group-hover:text-amber-300 transition-colors text-base">
-                                {floor.name}
+                                Kat {totalFloors} & Kat {totalFloors - 1}
                               </h3>
 
                               <span
@@ -1311,11 +1456,10 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                               {effectiveUnits.map((u) => (
                                 <span
                                   key={u.id}
-                                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border transition-all ${
-                                    u.is_completed
+                                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border transition-all ${u.is_completed
                                       ? 'bg-amber-500/20 border-amber-400/60 text-amber-200 shadow-sm'
                                       : 'bg-slate-950/80 border-slate-800 text-slate-400'
-                                  }`}
+                                    }`}
                                 >
                                   {u.name} {u.is_completed ? '✓' : ''}
                                 </span>
@@ -1330,7 +1474,7 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                             className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80 lg:border-l lg:pl-6 lg:w-7/12 shrink-0"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {/* Custom Typology Select directly on the right side of this floor */}
+                            {/* Custom Typology Select */}
                             <div>
                               <label className="block text-xs font-bold text-amber-400/90 uppercase tracking-wider mb-1.5">
                                 Kat Kullanım Amacı:
@@ -1354,13 +1498,13 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                               />
                             </div>
 
-                            {/* Custom Unit Count Select directly on the right side of this floor */}
+                            {/* Custom Unit Count Select */}
                             <div>
                               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                                Kattaki {typoInfo.unitPrefix} Sayısı:
+                                Kattaki Dubleks Sayısı:
                               </label>
                               <CustomUnitCountSelect
-                                unitCount={currentTypo.unitCount ?? (floor.units?.length || 3)}
+                                unitCount={currentTypo.unitCount ?? (floor.units?.length || newUnitsPerFloor)}
                                 unitPrefix={typoInfo.unitPrefix}
                                 floorNumber={floor.floor_number}
                                 onOpen={() => setSelectedFloorId(floor.id)}
@@ -1385,9 +1529,8 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                               <div className="text-xs font-semibold text-white">%{progress}</div>
                               <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
                                 <div
-                                  className={`h-full transition-all duration-700 ${
-                                    isFullyDone ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]' : 'bg-slate-600'
-                                  }`}
+                                  className={`h-full transition-all duration-700 ${isFullyDone ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]' : 'bg-slate-600'
+                                    }`}
                                   style={{ width: `${progress}%` }}
                                 />
                               </div>
@@ -1399,11 +1542,10 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                                 setSelectedFloorId(isSelected ? null : floor.id);
                                 setSelectedUnitId(null);
                               }}
-                              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                                isSelected
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isSelected
                                   ? 'bg-amber-500 text-slate-950 shadow-md'
                                   : 'bg-slate-800/80 text-slate-400 group-hover:bg-slate-700 group-hover:text-white'
-                              }`}
+                                }`}
                             >
                               <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'rotate-90 text-slate-950' : ''}`} />
                             </button>
@@ -1413,59 +1555,220 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                       {isSelected && !isSettingsMode && renderFloorInspectionPanel(floor)}
                     </div>
                   );
-                })
-              ) : (
-              <div className="p-8 text-center bg-slate-900/60 border border-slate-800 rounded-2xl text-xs text-slate-400">
-                Kat verisi bulunamadı.
+                }
+
+                return (
+                  <div
+                    key={floor.id}
+                    style={{ zIndex: isSelected ? 100 : floor.floor_number * 10 }}
+                    onClick={() => {
+                      setSelectedFloorId(isSelected ? null : floor.id);
+                      setSelectedUnitId(null);
+                    }}
+                    className={`
+                        relative cursor-pointer transition-all duration-300 rounded-2xl border p-5 sm:p-6 group
+                        ${isSelected
+                        ? 'scale-[1.01] ring-2 ring-amber-400/80 border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
+                        : 'hover:scale-[1.005]'
+                      }
+                        ${isFullyDone
+                        ? `${typoInfo.badgeStyle} bg-gradient-to-r ${typoInfo.bgGradient}`
+                        : 'bg-slate-900/75 border-slate-800 hover:border-slate-700 backdrop-blur-md'
+                      }
+                      `}
+                  >
+                    {/* Left Column Accent Bar */}
+                    <div
+                      className={`absolute top-0 left-0 bottom-0 w-2 rounded-l-2xl transition-all duration-500 ${isFullyDone
+                          ? 'bg-gradient-to-b from-amber-400 to-yellow-500 shadow-[0_0_14px_rgba(245,158,11,0.9)]'
+                          : typoInfo.barColor
+                        }`}
+                    />
+
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pl-2">
+                      {/* Floor Left Visual Information */}
+                      <div className="flex items-center gap-4 lg:w-5/12">
+                        <div
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm transition-all duration-300 shrink-0 ${isSelected
+                              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/50'
+                              : 'bg-slate-800 text-slate-300 group-hover:text-white'
+                            }`}
+                        >
+                          {floor.floor_number}.K
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-bold text-white group-hover:text-amber-300 transition-colors text-base">
+                              {floor.name}
+                            </h3>
+
+                            <span
+                              className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 ${typoInfo.badgeStyle}`}
+                            >
+                              <TypoIcon className="w-3.5 h-3.5" />
+                              <span>{typoInfo.shortBadge} ({effectiveUnits.length} Birim)</span>
+                            </span>
+                          </div>
+
+                          {/* Units Preview Blocks */}
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                            {effectiveUnits.map((u) => (
+                              <span
+                                key={u.id}
+                                className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border transition-all ${u.is_completed
+                                    ? 'bg-amber-500/20 border-amber-400/60 text-amber-200 shadow-sm'
+                                    : 'bg-slate-950/80 border-slate-800 text-slate-400'
+                                  }`}
+                              >
+                                {u.name} {u.is_completed ? '✓' : ''}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* RIGHT SIDE OF THIS EXACT SAME FLOOR ROW: SETTINGS CONTROLS OR PROGRESS */}
+                      {isSettingsMode ? (
+                        <div
+                          className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80 lg:border-l lg:pl-6 lg:w-7/12 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* Custom Typology Select directly on the right side of this floor */}
+                          <div>
+                            <label className="block text-xs font-bold text-amber-400/90 uppercase tracking-wider mb-1.5">
+                              Kat Kullanım Amacı:
+                            </label>
+                            <CustomTypologySelect
+                              value={effectiveTypeKey}
+                              floorNumber={floor.floor_number}
+                              totalFloors={totalFloors}
+                              onOpen={() => setSelectedFloorId(floor.id)}
+                              onChange={(newType) => {
+                                setSelectedFloorId(floor.id);
+                                const updated = {
+                                  ...floorTypologies,
+                                  [floor.id]: {
+                                    ...currentTypo,
+                                    type: newType,
+                                  },
+                                };
+                                saveTypologies(updated);
+                              }}
+                            />
+                          </div>
+
+                          {/* Custom Unit Count Select directly on the right side of this floor */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                              Kattaki {typoInfo.unitPrefix} Sayısı:
+                            </label>
+                            <CustomUnitCountSelect
+                              unitCount={currentTypo.unitCount ?? (floor.units?.length || newUnitsPerFloor)}
+                              unitPrefix={typoInfo.unitPrefix}
+                              floorNumber={floor.floor_number}
+                              onOpen={() => setSelectedFloorId(floor.id)}
+                              onChange={(count) => {
+                                setSelectedFloorId(floor.id);
+                                const updated = {
+                                  ...floorTypologies,
+                                  [floor.id]: {
+                                    ...currentTypo,
+                                    type: effectiveTypeKey,
+                                    unitCount: count,
+                                  },
+                                };
+                                saveTypologies(updated);
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-4">
+                          <div className="text-right hidden sm:block">
+                            <div className="text-xs font-semibold text-white">%{progress}</div>
+                            <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                              <div
+                                className={`h-full transition-all duration-700 ${isFullyDone ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,1)]' : 'bg-slate-600'
+                                  }`}
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedFloorId(isSelected ? null : floor.id);
+                              setSelectedUnitId(null);
+                            }}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isSelected
+                                ? 'bg-amber-500 text-slate-950 shadow-md'
+                                : 'bg-slate-800/80 text-slate-400 group-hover:bg-slate-700 group-hover:text-white'
+                              }`}
+                          >
+                            <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'rotate-90 text-slate-950' : ''}`} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {isSelected && !isSettingsMode && renderFloorInspectionPanel(floor)}
+                  </div>
+                );
+              })
+          ) : (
+            <div className="p-8 text-center bg-gradient-to-br from-amber-500/5 via-slate-900/80 to-slate-900/80 border border-amber-500/20 border-dashed rounded-2xl animate-fadeIn">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <Layers className="w-7 h-7 text-amber-400/60" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-300 mb-1">Henüz kat eklenmemiş</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {isSettingsMode ? (
+                      <>Aşağıdaki araç çubuğundan <span className="text-amber-400 font-bold">Kat Ekle</span> butonuna tıklayarak bina katlarını oluşturun.</>
+                    ) : (
+                      <>
+                        Binayı oluşturmak için sağ üstteki
+                        <button
+                          type="button"
+                          onClick={toggleSettingsMode}
+                          className="inline-flex items-center gap-1 mx-1 px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[11px] hover:bg-amber-500/30 transition cursor-pointer"
+                        >
+                          <SlidersHorizontal className="w-3 h-3" /> Bina Ayarları
+                        </button>
+                        butonuna tıklayın.
+                      </>
+                    )}
+                  </p>
+                </div>
+
               </div>
-            )}
-
-          </div>
-
-          {/* Foundation Base Visual (Only visible when Settings Mode is OFF) */}
-          {!isSettingsMode && (
-            <div
-              className={`w-full rounded-2xl p-4 text-center text-xs font-extrabold flex items-center justify-center gap-2 transition-all duration-700 mt-2 ${
-                isFoundationDone
-                  ? 'bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-600/60 text-amber-300 shadow-xl shadow-amber-500/20'
-                  : 'bg-slate-900/60 border border-slate-800 border-dashed text-slate-600 opacity-60'
-              }`}
-            >
-              <Layers className={`w-4 h-4 ${isFoundationDone ? 'text-amber-400' : 'text-slate-600'}`} />
-              <span>
-                {isFoundationDone
-                  ? 'TEMEL RADYE BETON & ZEMİN ETÜDÜ (100% CANLI DOKU)'
-                  : 'TEMEL RADYE BETON & ZEMİN ETÜDÜ (GÖLGE — AŞAMALAR BEKLİYOR)'}
-              </span>
             </div>
           )}
 
-          {/* Bottom Reset Button for Settings Mode */}
-          {isSettingsMode && (
-            <div className="mt-4 w-full flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  const resetMap: Record<string, FloorTypologyConfig> = {};
-                  floors.forEach((f) => {
-                    resetMap[f.id] = {
-                      type: f.floor_number === 1 ? 'commercial_shop' : 'residential',
-                      unitCount: f.units?.length || 3,
-                    };
-                  });
-                  saveTypologies(resetMap);
-                }}
-                className="px-4 py-2.5 bg-slate-900 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:border-amber-500/60 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Kat Ayarlarını Sıfırla</span>
-              </button>
-            </div>
-          )}
         </div>
+
+        {/* Foundation Base Visual (Only visible when Settings Mode is OFF) */}
+        {!isSettingsMode && (
+          <div
+            className={`w-full rounded-2xl p-4 text-center text-xs font-extrabold flex items-center justify-center gap-2 transition-all duration-700 mt-2 ${isFoundationDone
+                ? 'bg-gradient-to-r from-amber-950/90 via-slate-900 to-amber-950/90 border border-amber-600/60 text-amber-300 shadow-xl shadow-amber-500/20'
+                : 'bg-slate-900/60 border border-slate-800 border-dashed text-slate-600 opacity-60'
+              }`}
+          >
+            <Layers className={`w-4 h-4 ${isFoundationDone ? 'text-amber-400' : 'text-slate-600'}`} />
+            <span>
+              {isFoundationDone
+                ? 'TEMEL RADYE BETON & ZEMİN ETÜDÜ (100% CANLI DOKU)'
+                : 'TEMEL RADYE BETON & ZEMİN ETÜDÜ (GÖLGE — AŞAMALAR BEKLİYOR)'}
+            </span>
+          </div>
+        )}
       </div>
-    );
-  };
+    </div>
+  );
+};
 
 
 

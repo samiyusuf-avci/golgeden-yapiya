@@ -142,8 +142,6 @@ export function App() {
     name: string;
     location: string;
     total_budget: number;
-    floor_count: number;
-    units_per_floor: number;
     visibility: VisibilityType;
     show_financials_to_clients: boolean;
     estimated_completion_months: number;
@@ -168,70 +166,16 @@ export function App() {
       setDetailSubTab('viewer');
     } catch (err) {
       console.warn('Backend unavailable, constructing new project locally', err);
-      // Create local project structure
-      const newFloors = Array.from({ length: data.floor_count }, (_, fIdx) => {
-        const floorNum = data.floor_count - fIdx;
-        const floorId = `floor-${floorNum}-${Date.now()}`;
-        const units = Array.from({ length: data.units_per_floor }, (_, uIdx) => {
-          const unitNum = floorNum * 100 + (uIdx + 1);
-          const unitId = `unit-${unitNum}-${Date.now()}`;
-          return {
-            id: unitId,
-            floor_id: floorId,
-            unit_number: unitNum,
-            name: `Daire ${unitNum}`,
-            is_completed: false,
-            stages: [
-              {
-                id: `st-u-${unitNum}-1`,
-                project_id: `proj-${Date.now()}`,
-                floor_id: floorId,
-                unit_id: unitId,
-                name: `Daire ${unitNum} Tesisat & İnce İşler`,
-                category: 'subcontractor',
-                estimated_cost: (data.total_budget * 0.3) / (data.floor_count * data.units_per_floor),
-                actual_cost: 0,
-                weight_percentage: 3,
-                is_completed: false,
-                order_index: 1,
-              },
-            ],
-          };
-        });
-
-        return {
-          id: floorId,
-          project_id: `proj-${Date.now()}`,
-          floor_number: floorNum,
-          name: `${floorNum}. Kat`,
-          is_completed: false,
-          units,
-          stages: [
-            {
-              id: `st-f-${floorNum}-1`,
-              project_id: `proj-${Date.now()}`,
-              floor_id: floorId,
-              name: `${floorNum}. Kat Kolon & Betonarme`,
-              category: 'labor',
-              estimated_cost: (data.total_budget * 0.4) / data.floor_count,
-              actual_cost: 0,
-              weight_percentage: 8,
-              is_completed: false,
-              order_index: 1,
-            },
-          ],
-        };
-      });
-
+      // Create local project with empty floors (user will add floors from building settings)
       const localNewProject: Project = {
         id: `proj-${Date.now()}`,
         contractor_id: 'c-demo-1',
         name: data.name,
         location: data.location || 'Türkiye',
-        description: `${data.floor_count} Katlı Yeni Başlanan İnşaat Projesi`,
+        description: `Yeni Başlanan İnşaat Projesi`,
         estimated_completion_months: data.estimated_completion_months,
         status: 'planning',
-        unit_count: data.floor_count * data.units_per_floor,
+        unit_count: 0,
         total_budget: data.total_budget,
         visibility: data.visibility,
         show_financials_to_clients: data.show_financials_to_clients,
@@ -239,30 +183,53 @@ export function App() {
         financial_progress: 0,
         total_actual_cost: 0,
         cost_variance: data.total_budget,
-        floors: newFloors,
+        floors: [],
+
         expenses: [],
         stages: [
           {
             id: `st-p-1`,
             project_id: `proj-${Date.now()}`,
-            name: 'Ruhsat ve Hafriyat Kazısı',
+            name: 'Ruhsat ve Proje Onayı',
             category: 'official',
-            estimated_cost: data.total_budget * 0.1,
+            estimated_cost: data.total_budget * 0.05,
             actual_cost: 0,
-            weight_percentage: 15,
+            weight_percentage: 5,
             is_completed: false,
             order_index: 1,
           },
           {
             id: `st-p-2`,
             project_id: `proj-${Date.now()}`,
-            name: 'Temel Radye Beton',
+            name: 'Temel Kazı ve Hafriyat',
             category: 'material',
-            estimated_cost: data.total_budget * 0.2,
+            estimated_cost: data.total_budget * 0.1,
             actual_cost: 0,
-            weight_percentage: 20,
+            weight_percentage: 10,
             is_completed: false,
             order_index: 2,
+          },
+          {
+            id: `st-p-3`,
+            project_id: `proj-${Date.now()}`,
+            name: 'Temel Radye Beton',
+            category: 'material',
+            estimated_cost: data.total_budget * 0.15,
+            actual_cost: 0,
+            weight_percentage: 15,
+            is_completed: false,
+            order_index: 3,
+          },
+          {
+            id: `st-p-4`,
+            project_id: `proj-${Date.now()}`,
+            name: 'Çevre Çiti ve Şantiye Kurulumu',
+            category: 'labor',
+            estimated_cost: data.total_budget * 0.05,
+            actual_cost: 0,
+            weight_percentage: 5,
+            is_completed: false,
+            order_index: 4,
           },
         ],
       };
@@ -357,8 +324,25 @@ export function App() {
     const mergedFloor = mergedFloorNumber ? activeProject.floors.find((f) => f.floor_number === mergedFloorNumber) : null;
 
     const newFloors = activeProject.floors.map((f) => {
-      if (f.id === floorId && f.stages) {
-        const updatedStages = f.stages.map((st) =>
+      if (f.id === floorId) {
+        let currentStages = f.stages ? [...f.stages] : [];
+        const stageExists = currentStages.some((st) => st.id === stageId);
+        if (!stageExists) {
+          const firstStage = currentStages[0];
+          currentStages.push({
+            id: stageId,
+            project_id: activeProject.id,
+            floor_id: f.id,
+            name: `${f.floor_number}. Kat Tuğla Duvar Örme & Bölmeler`,
+            category: 'labor',
+            estimated_cost: firstStage ? Math.round((firstStage.estimated_cost || 1000000) * 0.65) : 800000,
+            actual_cost: isCompleted ? 780000 : 0,
+            weight_percentage: 6,
+            is_completed: isCompleted,
+            order_index: 2,
+          });
+        }
+        const updatedStages = currentStages.map((st) =>
           st.id === stageId ? { ...st, is_completed: isCompleted } : st
         );
         const allDone = updatedStages.every((st) => st.is_completed);

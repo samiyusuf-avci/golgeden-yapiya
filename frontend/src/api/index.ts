@@ -45,13 +45,101 @@ export class ApiService {
     };
   }
 
+  static normalizeProject(proj: Project): Project {
+    if (!proj) return proj;
+    let stages = proj.stages || [];
+    // If project has less than 4 base stages or old 2 stages, upgrade to standard 4 base stages
+    if (stages.length < 4) {
+      const isCompleted = stages.length > 0 && stages.every((s) => s.is_completed);
+      stages = [
+        {
+          id: `s-1-${proj.id}`,
+          project_id: proj.id,
+          name: 'Ruhsat ve Proje Onayı',
+          category: 'official',
+          estimated_cost: Math.round(proj.total_budget * 0.05),
+          actual_cost: isCompleted ? Math.round(proj.total_budget * 0.05) : 0,
+          weight_percentage: 5,
+          is_completed: isCompleted,
+          order_index: 1,
+        },
+        {
+          id: `s-2-${proj.id}`,
+          project_id: proj.id,
+          name: 'Temel Kazı ve Hafriyat',
+          category: 'material',
+          estimated_cost: Math.round(proj.total_budget * 0.1),
+          actual_cost: isCompleted ? Math.round(proj.total_budget * 0.1) : 0,
+          weight_percentage: 10,
+          is_completed: isCompleted,
+          order_index: 2,
+        },
+        {
+          id: `s-3-${proj.id}`,
+          project_id: proj.id,
+          name: 'Temel Radye Beton',
+          category: 'material',
+          estimated_cost: Math.round(proj.total_budget * 0.15),
+          actual_cost: isCompleted ? Math.round(proj.total_budget * 0.15) : 0,
+          weight_percentage: 15,
+          is_completed: isCompleted,
+          order_index: 3,
+        },
+        {
+          id: `s-4-${proj.id}`,
+          project_id: proj.id,
+          name: 'Çevre Çiti ve Şantiye Kurulumu',
+          category: 'labor',
+          estimated_cost: Math.round(proj.total_budget * 0.05),
+          actual_cost: isCompleted ? Math.round(proj.total_budget * 0.05) : 0,
+          weight_percentage: 5,
+          is_completed: isCompleted,
+          order_index: 4,
+        },
+      ];
+    }
+
+    // Also normalize each floor's stages so every floor has both stages
+    const floors = (proj.floors || []).map((floor) => {
+      let floorStages = floor.stages || [];
+      const hasWallStage = floorStages.some(
+        (s) => s.name.toLowerCase().includes('duvar') || s.name.toLowerCase().includes('bölme')
+      );
+      if (!hasWallStage && floorStages.length >= 1) {
+        const firstStage = floorStages[0];
+        const wallStage = {
+          id: `${firstStage.id}-duvar`,
+          project_id: firstStage.project_id,
+          floor_id: floor.id,
+          name: `${floor.floor_number}. Kat Tuğla Duvar Örme & Bölmeler`,
+          category: 'labor',
+          estimated_cost: Math.round((firstStage.estimated_cost || 1000000) * 0.65),
+          actual_cost: 0,
+          weight_percentage: 6,
+          is_completed: false,
+          order_index: 2,
+        };
+        floorStages = [firstStage, wallStage];
+      }
+      return { ...floor, stages: floorStages };
+    });
+
+    return {
+      ...proj,
+      stages,
+      floors,
+    };
+  }
+
   static getStoredProjects(): Project[] | null {
     try {
       const data = localStorage.getItem('golgeden_projects');
       if (data) {
         const parsed = JSON.parse(data);
         if (Array.isArray(parsed)) {
-          return parsed;
+          const normalized = parsed.map((p) => this.normalizeProject(p));
+          this.saveProjectsToStorage(normalized);
+          return normalized;
         }
       }
     } catch (e) {
@@ -78,12 +166,13 @@ export class ApiService {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
+          const normalized = data.map((p) => this.normalizeProject(p));
           // If user previously deleted projects locally, respect local storage deletions
           if (stored !== null) {
             return stored;
           }
-          this.saveProjectsToStorage(data);
-          return data;
+          this.saveProjectsToStorage(normalized);
+          return normalized;
         }
       }
     } catch (err) {
@@ -94,7 +183,7 @@ export class ApiService {
       return stored;
     }
 
-    const initialMocks = this.getAllMockProjects(activeRole);
+    const initialMocks = this.getAllMockProjects(activeRole).map((p) => this.normalizeProject(p));
     this.saveProjectsToStorage(initialMocks);
     return initialMocks;
   }
@@ -114,17 +203,23 @@ export class ApiService {
   }
 
   static async getProject(id: string, activeRole: UserRole): Promise<Project> {
+    const stored = this.getStoredProjects();
+    if (stored) {
+      const found = stored.find((p) => p.id === id);
+      if (found) return this.normalizeProject(found);
+    }
     try {
       const res = await fetch(`${API_BASE}/projects/${id}`, {
         headers: this.getHeaders(activeRole),
       });
       if (!res.ok) throw new Error('Fetch project failed');
-      return await res.json();
+      const data = await res.json();
+      return this.normalizeProject(data);
     } catch (err) {
       console.warn('Backend getProject failed, searching local mock projects', err);
       const all = this.getAllMockProjects(activeRole);
       const found = all.find((p) => p.id === id);
-      return found || all[0];
+      return this.normalizeProject(found || all[0]);
     }
   }
 
@@ -321,24 +416,46 @@ export class ApiService {
         {
           id: 's-1',
           project_id: 'demo-project-zumrut-kule',
-          name: 'Hafriyat ve Temel Kazısı',
+          name: 'Ruhsat ve Proje Onayı',
           category: 'official',
-          estimated_cost: isClientHidden ? 0 : 1500000,
-          actual_cost: isClientHidden ? 0 : 1420000,
-          weight_percentage: 15,
+          estimated_cost: isClientHidden ? 0 : 1750000,
+          actual_cost: isClientHidden ? 0 : 1750000,
+          weight_percentage: 5,
           is_completed: true,
           order_index: 1,
         },
         {
           id: 's-2',
           project_id: 'demo-project-zumrut-kule',
-          name: 'Temel Radye Beton ve Yalıtım',
+          name: 'Temel Kazı ve Hafriyat',
           category: 'material',
-          estimated_cost: isClientHidden ? 0 : 2000000,
-          actual_cost: isClientHidden ? 0 : 1980000,
-          weight_percentage: 20,
+          estimated_cost: isClientHidden ? 0 : 3500000,
+          actual_cost: isClientHidden ? 0 : 3480000,
+          weight_percentage: 10,
           is_completed: true,
           order_index: 2,
+        },
+        {
+          id: 's-3',
+          project_id: 'demo-project-zumrut-kule',
+          name: 'Temel Radye Beton',
+          category: 'material',
+          estimated_cost: isClientHidden ? 0 : 5250000,
+          actual_cost: isClientHidden ? 0 : 5200000,
+          weight_percentage: 15,
+          is_completed: true,
+          order_index: 3,
+        },
+        {
+          id: 's-4',
+          project_id: 'demo-project-zumrut-kule',
+          name: 'Çevre Çiti ve Şantiye Kurulumu',
+          category: 'labor',
+          estimated_cost: isClientHidden ? 0 : 1750000,
+          actual_cost: isClientHidden ? 0 : 1700000,
+          weight_percentage: 5,
+          is_completed: true,
+          order_index: 4,
         },
       ],
       floors: [
@@ -359,7 +476,19 @@ export class ApiService {
               actual_cost: 0,
               weight_percentage: 8,
               is_completed: false,
-              order_index: 5,
+              order_index: 1,
+            },
+            {
+              id: 'stage-floor-5-duvar',
+              project_id: 'demo-project-zumrut-kule',
+              floor_id: 'floor-5',
+              name: '5. Kat Tuğla Duvar Örme & Bölmeler',
+              category: 'labor',
+              estimated_cost: isClientHidden ? 0 : 800000,
+              actual_cost: 0,
+              weight_percentage: 6,
+              is_completed: false,
+              order_index: 2,
             },
           ],
           units: [
@@ -384,7 +513,19 @@ export class ApiService {
               actual_cost: 0,
               weight_percentage: 8,
               is_completed: false,
-              order_index: 4,
+              order_index: 1,
+            },
+            {
+              id: 'stage-floor-4-duvar',
+              project_id: 'demo-project-zumrut-kule',
+              floor_id: 'floor-4',
+              name: '4. Kat Tuğla Duvar Örme & Bölmeler',
+              category: 'labor',
+              estimated_cost: isClientHidden ? 0 : 800000,
+              actual_cost: 0,
+              weight_percentage: 6,
+              is_completed: false,
+              order_index: 2,
             },
           ],
           units: [
@@ -409,7 +550,19 @@ export class ApiService {
               actual_cost: isClientHidden ? 0 : 1150000,
               weight_percentage: 8,
               is_completed: true,
-              order_index: 3,
+              order_index: 1,
+            },
+            {
+              id: 'stage-floor-3-duvar',
+              project_id: 'demo-project-zumrut-kule',
+              floor_id: 'floor-3',
+              name: '3. Kat Tuğla Duvar Örme & Bölmeler',
+              category: 'labor',
+              estimated_cost: isClientHidden ? 0 : 800000,
+              actual_cost: 0,
+              weight_percentage: 6,
+              is_completed: false,
+              order_index: 2,
             },
           ],
           units: [
@@ -433,6 +586,18 @@ export class ApiService {
               estimated_cost: isClientHidden ? 0 : 1200000,
               actual_cost: isClientHidden ? 0 : 1150000,
               weight_percentage: 8,
+              is_completed: true,
+              order_index: 1,
+            },
+            {
+              id: 'stage-floor-2-duvar',
+              project_id: 'demo-project-zumrut-kule',
+              floor_id: 'floor-2',
+              name: '2. Kat Tuğla Duvar Örme & Bölmeler',
+              category: 'labor',
+              estimated_cost: isClientHidden ? 0 : 800000,
+              actual_cost: isClientHidden ? 0 : 780000,
+              weight_percentage: 6,
               is_completed: true,
               order_index: 2,
             },
@@ -460,6 +625,18 @@ export class ApiService {
               weight_percentage: 8,
               is_completed: true,
               order_index: 1,
+            },
+            {
+              id: 'stage-floor-1-duvar',
+              project_id: 'demo-project-zumrut-kule',
+              floor_id: 'floor-1',
+              name: '1. Kat Tuğla Duvar Örme & Bölmeler',
+              category: 'labor',
+              estimated_cost: isClientHidden ? 0 : 800000,
+              actual_cost: isClientHidden ? 0 : 790000,
+              weight_percentage: 6,
+              is_completed: true,
+              order_index: 2,
             },
           ],
           units: [
