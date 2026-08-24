@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getProjectUnitCount, type UserProfile, type Project } from '../types';
 import {
   User,
+  UserX,
   Mail,
   Phone,
   MapPin,
@@ -14,21 +15,30 @@ import {
   Eye,
   Shield,
   Layers,
-  Save
+  Save,
+  Lock
 } from 'lucide-react';
 
 interface ProfileViewProps {
   profile: UserProfile;
   projects: Project[];
   followedProjects: Project[];
+  allProjects?: Project[];
   onUpdateProfile?: (updated: UserProfile) => void;
+  isGuest?: boolean;
+  onOpenAuthModal?: () => void;
+  onSelectMainTab?: (tab: any) => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
   profile: initialProfile,
   projects,
   followedProjects,
+  allProjects = [],
   onUpdateProfile,
+  isGuest,
+  onOpenAuthModal,
+  onSelectMainTab,
 }) => {
   const [profile, setProfile] = useState<UserProfile>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
@@ -36,6 +46,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const totalManagedBudget = projects.reduce((sum, p) => sum + (p.total_budget || 0), 0);
   const totalUnits = projects.reduce((sum, p) => sum + getProjectUnitCount(p), 0);
+  const totalInspectable = allProjects.length > 0
+    ? allProjects.length
+    : Math.max(followedProjects.length, projects.length, 3);
 
   const handleSave = () => {
     setIsEditing(false);
@@ -43,6 +56,83 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       onUpdateProfile(profile);
     }
   };
+
+  if (isGuest) {
+    return (
+      <div className="space-y-8 animate-fadeIn max-w-4xl mx-auto py-4">
+        {/* Guest Profile Hero Card */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-slate-800 p-8 md:p-10 shadow-2xl">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row items-center gap-6 relative z-10 text-center md:text-left">
+            <div className="w-24 h-24 rounded-3xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 shadow-xl shadow-cyan-500/5">
+              <UserX className="w-12 h-12" />
+            </div>
+
+            <div className="space-y-2 flex-1">
+              <div className="inline-flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-bold px-3 py-1 rounded-full">
+                <Eye className="w-3.5 h-3.5" /> Misafir Modu (Salt Okunur)
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+                Misafir Kullanıcı Oturumu
+              </h2>
+              <p className="text-xs md:text-sm text-slate-400 max-w-xl">
+                Platformu üyelik oluşturmadan denemektesiniz. Misafir oturumunda kişisel veya kurumsal profil bilgileri kayıt edilmez ve gösterilmez.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Guest Information & Restriction Card */}
+        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-400 shrink-0">
+              <Lock className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white">Profil ve Yönetici Özellikleri Kısıtlıdır</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Profil bilgilerinizi (ad, soyad, şirket unvanı, iletişim verileri) tanımlamak ve kendi şantiyelerinizi yönetmek için sisteme kayıtlı bir kullanıcı hesabı ile giriş yapmanız gerekmektedir.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+            <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">İnceleyebileceğiniz Şantiyeler</span>
+              <div className="text-xl font-black text-sky-400 mt-1">{totalInspectable} Canlı Proje</div>
+              <p className="text-[10px] text-slate-500 mt-0.5">Platformda incelemeye açık aktif şantiye verileri</p>
+            </div>
+
+            <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Erişim Yetkisi</span>
+              <div className="text-xl font-black text-emerald-400 mt-1">Salt Okunur (Ziyaretçi)</div>
+              <p className="text-[10px] text-slate-500 mt-0.5">Şantiye imalatları sadece izlenebilir</p>
+            </div>
+          </div>
+
+          <div className="pt-4 flex flex-col sm:flex-row items-center gap-3 justify-end border-t border-slate-800/80">
+            {onSelectMainTab && (
+              <button
+                onClick={() => onSelectMainTab('following')}
+                className="w-full sm:w-auto px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Eye className="w-4 h-4" /> Şantiyeleri ve Projeleri İncele
+              </button>
+            )}
+            {onOpenAuthModal && (
+              <button
+                onClick={onOpenAuthModal}
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-300 transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <User className="w-4 h-4" /> Giriş Yap / Kayıt Ol
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -166,21 +256,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       <div className="bg-slate-900/80 border border-slate-800 p-1.5 rounded-2xl flex items-center gap-2 max-w-md">
         <button
           onClick={() => setActiveSubTab('info')}
-          className={`flex-1 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-            activeSubTab === 'info'
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${activeSubTab === 'info'
               ? 'bg-amber-500 text-slate-950 shadow-md'
               : 'text-slate-400 hover:text-white'
-          }`}
+            }`}
         >
           Kişisel & Şirket Bilgileri
         </button>
         <button
           onClick={() => setActiveSubTab('settings')}
-          className={`flex-1 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-            activeSubTab === 'settings'
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${activeSubTab === 'settings'
               ? 'bg-amber-500 text-slate-950 shadow-md'
               : 'text-slate-400 hover:text-white'
-          }`}
+            }`}
         >
           Bildirim & Güvenlik
         </button>

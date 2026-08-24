@@ -196,8 +196,16 @@ func (r *Repository) GetProjectByID(id string) (*models.Project, error) {
 	return &p, nil
 }
 
-func (r *Repository) ListProjects() ([]models.Project, error) {
-	rows, err := r.db.Query(`SELECT id, contractor_id, name, location, total_budget, visibility, show_financials_to_clients, created_at FROM projects ORDER BY created_at DESC`)
+func (r *Repository) ListProjects(userID string) ([]models.Project, error) {
+	var rows *sql.Rows
+	var err error
+
+	if userID == "" {
+		rows, err = r.db.Query(`SELECT id, contractor_id, name, location, total_budget, visibility, show_financials_to_clients, created_at FROM projects ORDER BY created_at DESC`)
+	} else {
+		rows, err = r.db.Query(`SELECT id, contractor_id, name, location, total_budget, visibility, show_financials_to_clients, created_at FROM projects WHERE contractor_id = ? ORDER BY created_at DESC`, userID)
+	}
+
 	if err != nil {
 		return nil, err
 	}

@@ -32,6 +32,21 @@ export const ClientViewer: React.FC<ClientViewerProps> = ({ project }) => {
     f.units?.some((u) => u.id === selectedUnit?.id)
   );
 
+  const TR_MONTHS = [
+    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  ];
+
+  const planlananTeslimatText = (() => {
+    const months = project.estimated_completion_months;
+    if (!months) return '—';
+    const startDate = project.created_at ? new Date(project.created_at) : new Date();
+    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + months, 1);
+    const monthName = TR_MONTHS[endDate.getMonth()];
+    const year = endDate.getFullYear();
+    return `${monthName} ${year} (${months} Ay)`;
+  })();
+
   // Fallback stages generator for units without custom backend stages
   const getUnitStages = (unit: Unit): Stage[] => {
     if (unit.stages && unit.stages.length > 0) {
@@ -242,7 +257,7 @@ export const ClientViewer: React.FC<ClientViewerProps> = ({ project }) => {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400">Planlanan Anahtar Teslim:</span>
-                  <span className="font-semibold text-white">Q4 2026</span>
+                  <span className="font-semibold text-white ml-2">{planlananTeslimatText}</span>
                 </div>
               </div>
             </div>

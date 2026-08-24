@@ -105,7 +105,7 @@ func (h *APIHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 func (h *APIHandler) Me(w http.ResponseWriter, r *http.Request) {
 	userCtx := middleware.GetUserFromContext(r.Context())
-	if userCtx.ID == "" {
+	if userCtx == nil || userCtx.ID == "" {
 		respondError(w, http.StatusUnauthorized, "Not authenticated")
 		return
 	}
@@ -122,10 +122,19 @@ func (h *APIHandler) Me(w http.ResponseWriter, r *http.Request) {
 // Project Handlers
 func (h *APIHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 	userCtx := middleware.GetUserFromContext(r.Context())
-	projects, err := h.repo.ListProjects()
+	if userCtx == nil || userCtx.ID == "" {
+		respondError(w, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+
+	projects, err := h.repo.ListProjects(userCtx.ID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch projects")
 		return
+	}
+
+	if projects == nil {
+		projects = []models.Project{}
 	}
 
 	var result []models.Project
@@ -140,13 +149,8 @@ func (h *APIHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 
 		h.progressService.CalculateProjectMetrics(p)
 
-		// Override role if passed via header override for demo testing
-		activeRole := userCtx.Role
-		if roleOverride := r.Header.Get("X-Demo-Role"); roleOverride != "" {
-			activeRole = models.UserRole(roleOverride)
-		}
-
-		h.progressService.SanitizeForRole(p, activeRole)
+		// All users have full access to their account's projects
+		h.progressService.SanitizeForRole(p, models.RoleContractor)
 		result = append(result, *p)
 	}
 
@@ -197,11 +201,9 @@ func (h *APIHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create floors, units & default stages if specified
-	floorCount := req.FloorCount
 	if floorCount <= 0 {
 		floorCount = 4
 	}
-	unitsPerFloor := req.UnitsPerFloor
 	if unitsPerFloor <= 0 {
 		unitsPerFloor = 2
 	}
@@ -271,10 +273,10 @@ func (h *APIHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 			unitNumber := (f * 100) + u
 			unitID := uuid.New().String()
 			unit := &models.Unit{
-				ID:          unitID,
-				FloorID:     floorID,
-				UnitNumber:  unitNumber,
-				Name:        fmt.Sprintf("Daire %d", unitNumber),
+				ID:         unitID,
+				FloorID:    floorID,
+				UnitNumber: unitNumber,
+				Name:       fmt.Sprintf("Daire %d", unitNumber),
 			}
 			_ = h.repo.CreateUnit(unit)
 
@@ -399,7 +401,6 @@ func (h *APIHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	h.progressService.CalculateProjectMetrics(project)
 	respondJSON(w, http.StatusOK, project)
 }
-
 
 func (h *APIHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "id")
@@ -607,4 +608,79 @@ func (h *APIHandler) SeedDemoProject(w http.ResponseWriter, r *http.Request) {
 	fullProject, _ := h.repo.GetProjectByID(projectID)
 	h.progressService.CalculateProjectMetrics(fullProject)
 	respondJSON(w, http.StatusOK, fullProject)
+}
+
+func (h *APIHandler) seedUserStarterProject(user *models.User) {
+	if user == nil || user.ID == "" {
+		return
+	}
+
+	projectID := "proj-" + uuid.New().String()[:8]
+	projectName := fmt.Sprintf("%s - Proje 1", user.Name)
+	if user.Role == models.RoleClient {
+		projectName = "Kendi Rezidans Projem"
+	}
+
+	project := &models.Project{
+		ID:                      projectID,
+		ContractorID:            user.ID,
+		Name:                    projectName,
+		Location:                "Kadıköy / İstanbul",
+		TotalBudget:             18500000,
+		Visibility:              models.VisibilityPrivate,
+		ShowFinancialsToClients: false,
+	}
+	_ = h.repo.CreateProject(project)
+
+	// Create Base Stages
+	stage1 := &models.Stage{ID: "s-1-" + projectID, ProjectID: projectID, Name: "Ruhsat ve Proje Onayı", Category: "official", EstimatedCost: 925000, ActualCost: 925000, WeightPercentage: 10, IsCompleted: true, OrderIndex: 1}
+	stage2 := &models.Stage{ID: "s-2-" + projectID, ProjectID: projectID, Name: "Temel Kazı ve Hafriyat", Category: "material", EstimatedCost: 1850000, ActualCost: 1800000, WeightPercentage: 15, IsCompleted: true, OrderIndex: 2}
+	stage3 := &models.Stage{ID: "s-3-" + projectID, ProjectID: projectID, Name: "Temel Radye Beton", Category: "material", EstimatedCost: 2775000, ActualCost: 0, WeightPercentage: 20, IsCompleted: false, OrderIndex: 3}
+	stage4 := &models.Stage{ID: "s-4-" + projectID, ProjectID: projectID, Name: "Çevre Çiti ve Şantiye Kurulumu", Category: "labor", EstimatedCost: 925000, ActualCost: 900000, WeightPercentage: 5, IsCompleted: true, OrderIndex: 4}
+
+	_ = h.repo.CreateStage(stage1)
+	_ = h.repo.CreateStage(stage2)
+	_ = h.repo.CreateStage(stage3)
+	_ = h.repo.CreateStage(stage4)
+
+	// Create 3 Floors
+	for f := 1; f <= 3; f++ {
+		floorID := fmt.Sprintf("fl-%s-%d", projectID[:6], f)
+		floorCompleted := f == 1
+		floor := &models.BuildingFloor{
+			ID:          floorID,
+			ProjectID:   projectID,
+			FloorNumber: f,
+			Name:        fmt.Sprintf("%d. Kat", f),
+			IsCompleted: floorCompleted,
+		}
+		_ = h.repo.CreateFloor(floor)
+
+		// 2 Units per floor
+		for u := 1; u <= 2; u++ {
+			unitNum := (f * 100) + u
+			unitID := fmt.Sprintf("un-%s-%d", projectID[:6], unitNum)
+			unitCompleted := f == 1
+			unit := &models.Unit{
+				ID:          unitID,
+				FloorID:     floorID,
+				UnitNumber:  unitNum,
+				Name:        fmt.Sprintf("Daire %d (3+1)", unitNum),
+				IsCompleted: unitCompleted,
+			}
+			_ = h.repo.CreateUnit(unit)
+		}
+	}
+
+	// Sample expense
+	exp := &models.Expense{
+		ID:         "exp-" + uuid.New().String()[:8],
+		ProjectID:  projectID,
+		Category:   models.ExpenseMaterial,
+		Amount:     1800000,
+		Notes:      "İlk Hafriyat ve Şantiye Hazırlığı",
+		InvoiceURL: "https://example.com/invoice.pdf",
+		Date:       "2026-08-01",
+	}
+	_ = h.repo.CreateExpense(exp)
 }

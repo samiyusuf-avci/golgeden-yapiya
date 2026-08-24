@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { VisibilityType } from '../types';
-import { Building2, X, PlusCircle, Shield, Lock, Eye, Globe, MapPin, ChevronDown, Check, Timer } from 'lucide-react';
+import { Building2, X, PlusCircle, Lock, Eye, Globe, MapPin, ChevronDown, Check, Timer } from 'lucide-react';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -24,7 +24,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [location, setLocation] = useState('');
   const [totalBudget, setTotalBudget] = useState('');
   const [visibility, setVisibility] = useState<VisibilityType>('public');
-  const [showFinancials, setShowFinancials] = useState(false);
   const [completionMonths, setCompletionMonths] = useState(24);
 
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
@@ -53,7 +52,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       location,
       total_budget: budget,
       visibility,
-      show_financials_to_clients: showFinancials,
+      show_financials_to_clients: false,
       estimated_completion_months: completionMonths,
     });
 
@@ -223,22 +222,6 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                   <span>{label}</span>
                 </button>
               ))}
-            </div>
-
-            <div className="bg-slate-950 border border-slate-800/80 rounded-2xl p-3.5 flex items-center justify-between">
-              <span className="text-xs text-slate-300 flex items-center gap-2 font-bold">
-                <Shield className="w-4 h-4 text-amber-400" />
-                Müşterilere Finansal Verileri Göster
-              </span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showFinancials}
-                  onChange={(e) => setShowFinancials(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500" />
-              </label>
             </div>
           </div>
 

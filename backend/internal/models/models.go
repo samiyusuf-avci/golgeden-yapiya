@@ -50,6 +50,7 @@ type Project struct {
 	CreatedAt               time.Time      `json:"created_at"`
 
 	// Derived / Aggregated Metrics
+	UnitCount         int     `json:"unit_count,omitempty"`
 	PhysicalProgress  float64 `json:"physical_progress"`  // % completed based on stage weights
 	FinancialProgress float64 `json:"financial_progress"` // % spent of budget
 	TotalActualCost   float64 `json:"total_actual_cost"`  // Sum of expenses

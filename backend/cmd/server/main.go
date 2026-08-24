@@ -55,29 +55,32 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	// Apply JWT Auth Middleware
-	r.Use(customMiddleware.AuthMiddleware)
-
 	// API v1 Routes
 	r.Route("/api/v1", func(r chi.Router) {
-		// Auth
+		// Public Auth routes
 		r.Post("/auth/register", apiHandler.Register)
 		r.Post("/auth/login", apiHandler.Login)
-		r.Get("/auth/me", apiHandler.Me)
-
-		// Projects
-		r.Get("/projects", apiHandler.ListProjects)
-		r.Post("/projects", apiHandler.CreateProject)
-		r.Get("/projects/{id}", apiHandler.GetProjectByID)
-		r.Patch("/projects/{id}", apiHandler.UpdateProject)
-		r.Patch("/projects/{id}/visibility", apiHandler.UpdateVisibility)
-		r.Delete("/projects/{id}", apiHandler.DeleteProject)
-		r.Post("/projects/{id}/expenses", apiHandler.CreateExpense)
-		r.Get("/projects/{id}/expenses", apiHandler.ListExpenses)
 		r.Post("/projects/{id}/seed", apiHandler.SeedDemoProject)
 
-		// Stages
-		r.Patch("/stages/{id}", apiHandler.UpdateStage)
+		// Protected routes requiring authentication
+		r.Group(func(r chi.Router) {
+			r.Use(customMiddleware.RequireAuth)
+
+			r.Get("/auth/me", apiHandler.Me)
+
+			// Projects
+			r.Get("/projects", apiHandler.ListProjects)
+			r.Post("/projects", apiHandler.CreateProject)
+			r.Get("/projects/{id}", apiHandler.GetProjectByID)
+			r.Patch("/projects/{id}", apiHandler.UpdateProject)
+			r.Patch("/projects/{id}/visibility", apiHandler.UpdateVisibility)
+			r.Delete("/projects/{id}", apiHandler.DeleteProject)
+			r.Post("/projects/{id}/expenses", apiHandler.CreateExpense)
+			r.Get("/projects/{id}/expenses", apiHandler.ListExpenses)
+
+			// Stages
+			r.Patch("/stages/{id}", apiHandler.UpdateStage)
+		})
 	})
 
 	log.Printf("🚀 'Gölgeden Yapıya' Go Backend running on http://localhost:%s", port)

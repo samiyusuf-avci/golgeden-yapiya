@@ -19,22 +19,100 @@ export class ApiService {
     return headers;
   }
 
+  static async login(email: string, password: string): Promise<{ token: string; user: any }> {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Giriş başarısız' }));
+      throw new Error(err.error || 'Geçersiz e-posta veya şifre');
+    }
+
+    const data = await res.json();
+    localStorage.setItem('golgeden_token', data.token);
+    localStorage.setItem('golgeden_user', JSON.stringify(data.user));
+    localStorage.removeItem('golgeden_projects');
+    localStorage.removeItem('golgeden_active_project_id');
+    return data;
+  }
+
+  static async register(email: string, password: string, name: string, role: UserRole = 'contractor'): Promise<{ token: string; user: any }> {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, name, role }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Kayıt başarısız' }));
+      throw new Error(err.error || 'Kayıt işlemi gerçekleştirilemedi');
+    }
+
+    const data = await res.json();
+    localStorage.setItem('golgeden_token', data.token);
+    localStorage.setItem('golgeden_user', JSON.stringify(data.user));
+    localStorage.removeItem('golgeden_projects');
+    localStorage.removeItem('golgeden_active_project_id');
+    return data;
+  }
+
+  static async getCurrentUser(): Promise<any | null> {
+    const token = this.getToken();
+    if (!token) return null;
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        headers: this.getHeaders(),
+      });
+      if (res.ok) {
+        const user = await res.json();
+        localStorage.setItem('golgeden_user', JSON.stringify(user));
+        return user;
+      } else {
+        this.logout();
+        return null;
+      }
+    } catch {
+      const stored = localStorage.getItem('golgeden_user');
+      return stored ? JSON.parse(stored) : null;
+    }
+  }
+
+  static logout(): void {
+    localStorage.removeItem('golgeden_token');
+    localStorage.removeItem('golgeden_user');
+    localStorage.removeItem('golgeden_projects');
+    localStorage.removeItem('golgeden_active_project_id');
+    localStorage.removeItem('golgeden_is_detail_view');
+  }
+
   static getUserProfile(): UserProfile {
+    const storedUserStr = localStorage.getItem('golgeden_user');
+    let userObj: any = { name: 'Sami Yusuf Avcı', email: 'sami.avci@golgedenyapiya.com', role: 'contractor' };
+    if (storedUserStr) {
+      try {
+        userObj = JSON.parse(storedUserStr);
+      } catch (e) {}
+    }
+
     return {
-      id: 'usr-demo-001',
-      name: 'Sami Yusuf Avcı',
-      title: 'Kıdemli İnşaat Mühendisi & Proje Yöneticisi',
-      company: 'Avcı Yapı & Gayrimenkul A.Ş.',
-      email: 'sami.avci@golgedenyapiya.com',
+      id: userObj.id || 'usr-001',
+      name: userObj.name || 'Sami Yusuf Avcı',
+      title: userObj.role === 'client' ? 'Daire Sahibi & Yatırımcı' : 'Kıdemli İnşaat Mühendisi & Proje Yöneticisi',
+      company: userObj.role === 'client' ? 'Bireysel Yatırımcı' : 'Avcı Yapı & Gayrimenkul A.Ş.',
+      email: userObj.email || 'sami.avci@golgedenyapiya.com',
       phone: '+90 (532) 555 01 99',
       location: 'İstanbul, Türkiye',
       avatar_url: '',
-      bio: 'SaaS mimarisi, lüks rezidans projeleri, betonarme statik ve şeffaf şantiye yönetim uzmanı.',
+      bio: 'Gölgeden Yapıya platformu kullanıcısı.',
       stats: {
-        total_managed_projects: 3,
-        total_following_projects: 2,
-        total_budget_managed: 73000000,
-        total_units_completed: 28,
+        total_managed_projects: 1,
+        total_following_projects: 0,
+        total_budget_managed: 18500000,
+        total_units_completed: 6,
       },
       settings: {
         email_notifications: true,
@@ -157,35 +235,36 @@ export class ApiService {
   }
 
   static async getProjects(activeRole: UserRole = 'contractor'): Promise<Project[]> {
-    const stored = this.getStoredProjects();
-
     try {
       const res = await fetch(`${API_BASE}/projects`, {
         headers: this.getHeaders(activeRole),
       });
+      if (res.status === 401) {
+        this.logout();
+        throw new Error('Unauthorized');
+      }
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           const normalized = data.map((p) => this.normalizeProject(p));
-          // If user previously deleted projects locally, respect local storage deletions
-          if (stored !== null) {
-            return stored;
-          }
           this.saveProjectsToStorage(normalized);
           return normalized;
         }
       }
-    } catch (err) {
-      console.warn('Backend unavailable, using local persistent storage', err);
+    } catch (err: any) {
+      if (err.message === 'Unauthorized') throw err;
+      console.warn('Backend unavailable, checking local storage', err);
     }
 
+    const stored = this.getStoredProjects();
     if (stored !== null) {
       return stored;
     }
+    return [];
+  }
 
-    const initialMocks = this.getAllMockProjects(activeRole).map((p) => this.normalizeProject(p));
-    this.saveProjectsToStorage(initialMocks);
-    return initialMocks;
+  static getShowcaseProjects(): Project[] {
+    return this.getAllMockProjects('contractor').map((p) => this.normalizeProject(p));
   }
 
   static async seedDemoProject(activeRole: UserRole = 'contractor'): Promise<Project> {

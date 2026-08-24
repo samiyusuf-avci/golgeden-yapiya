@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getProjectUnitCount, type Project } from '../types';
+import { getProjectFloorsCount, getUnitsPerFloor } from '../utils/floorUtils';
 import {
   Eye,
   EyeOff,
@@ -16,39 +17,12 @@ import {
   CalendarCheck
 } from 'lucide-react';
 
-export const getProjectFloorsCount = (project: Project): number => {
-  if (project.floors && project.floors.length > 0) {
-    return project.floors.length;
-  }
-  const match = project.description?.match(/(\d+)\s*Kat/i);
-  if (match && match[1]) {
-    return parseInt(match[1], 10);
-  }
-  const units = getProjectUnitCount(project);
-  if (units > 0) return Math.max(1, Math.ceil(units / 2));
-  return 1;
-};
-
-export const getUnitsPerFloor = (project: Project): number => {
-  if (project.floors && project.floors.length > 0) {
-    const floorWithUnits = project.floors.find((f) => f.units && f.units.length > 0);
-    if (floorWithUnits?.units?.length) {
-      return floorWithUnits.units.length;
-    }
-  }
-  const totalFloors = getProjectFloorsCount(project);
-  const totalUnits = getProjectUnitCount(project);
-  if (totalFloors > 0 && totalUnits > 0) {
-    return Math.max(1, Math.round(totalUnits / totalFloors));
-  }
-  return 2;
-};
-
 interface FollowingViewProps {
   followedProjects: Project[];
   allProjects: Project[];
   onSelectProject: (project: Project) => void;
   onToggleFollow: (projectId: string) => void;
+  isGuest?: boolean;
 }
 
 export const FollowingView: React.FC<FollowingViewProps> = ({
@@ -56,9 +30,12 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
   allProjects,
   onSelectProject,
   onToggleFollow,
+  isGuest,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState<'followed' | 'discover'>('followed');
+  const [activeSubTab, setActiveSubTab] = useState<'followed' | 'discover'>(() => {
+    return followedProjects.length === 0 ? 'discover' : 'followed';
+  });
 
   const filteredFollowed = followedProjects.filter(
     (p) =>
@@ -106,21 +83,19 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
         <div className="bg-slate-900/80 border border-slate-800 p-1.5 rounded-2xl flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setActiveSubTab('followed')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-              activeSubTab === 'followed'
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${activeSubTab === 'followed'
                 ? 'bg-sky-500 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <Eye className="w-4 h-4" /> Takip Ettiklerim ({followedProjects.length})
           </button>
           <button
             onClick={() => setActiveSubTab('discover')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-              activeSubTab === 'discover'
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${activeSubTab === 'discover'
                 ? 'bg-sky-500 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <PlusCircle className="w-4 h-4" /> Yeni Şantiye Keşfet ({discoverProjects.length})
           </button>
@@ -293,6 +268,16 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
             })}
           </div>
         )
+      ) : discoverProjects.length === 0 ? (
+        <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-12 text-center max-w-lg mx-auto space-y-4 shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center mx-auto">
+            <PlusCircle className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-white">Keşfedilecek Yeni Şantiye Bulunmuyor</h3>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Platformdaki tüm aktif şantiyeler takip listenizde yer alıyor veya aramanıza uygun kamuya açık proje bulunamadı.
+          </p>
+        </div>
       ) : (
         /* Discover Tab */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -414,10 +399,14 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                     <ExternalLink className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => onToggleFollow(project.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleFollow(project.id);
+                    }}
+                    title={isGuest ? 'Misafir modunda takip işlemi kayıtlı kullanıcılar içindir' : 'Şantiyeyi Takip Et'}
                     className="flex-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold py-2.5 px-3 rounded-2xl text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-sky-500/20"
                   >
-                    <Eye className="w-4 h-4" /> Takip Et
+                    <Eye className="w-4 h-4" /> {isGuest ? 'Takip Et' : 'Takip Et'}
                   </button>
                 </div>
               </div>

@@ -20,6 +20,8 @@ import {
 interface SalesViewProps {
   project: Project;
   onUpdateProject: (updated: Project) => void;
+  isGuest?: boolean;
+  isReadOnly?: boolean;
 }
 
 function formatCurrency(value: number): string {
@@ -39,7 +41,17 @@ function formatPriceInput(raw: string): string {
   return parseInt(digits, 10).toLocaleString('tr-TR');
 }
 
-export function SalesView({ project: rawProject, onUpdateProject }: SalesViewProps) {
+export function SalesView({ project: rawProject, onUpdateProject: rawUpdateProject, isGuest = false, isReadOnly = false }: SalesViewProps) {
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const onUpdateProject = (updated: Project) => {
+    if (isGuest || isReadOnly) {
+      setToastMsg('⚠️ İnceleme Modu: Satış durumu ve birim fiyatı güncellemeleri yalnızca proje sahibi müteahhit tarafından yapılabilir.');
+      setTimeout(() => setToastMsg(null), 4000);
+      return;
+    }
+    rawUpdateProject(updated);
+  };
   const project = syncProjectFloorSettings(rawProject);
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
   const [defaultPriceInput, setDefaultPriceInput] = useState<string>(
@@ -122,150 +134,166 @@ export function SalesView({ project: rawProject, onUpdateProject }: SalesViewPro
     });
   };
 
-  // ─── Render ──────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      {/* ── Özet Kartları ── */}
-      {project.sales_enabled && <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {[
-          {
-            icon: <Home className="w-4 h-4" />,
-            label: 'Toplam Mülkiyet',
-            value: totalUnits,
-            color: 'text-slate-300',
-            bg: 'bg-slate-800/60',
-            border: 'border-slate-700/50',
-          },
-          {
-            icon: <BadgeCheck className="w-4 h-4" />,
-            label: 'Satılan',
-            value: soldUnits,
-            color: 'text-emerald-400',
-            bg: 'bg-emerald-500/10',
-            border: 'border-emerald-500/20',
-          },
-          {
-            icon: <ShoppingCart className="w-4 h-4" />,
-            label: 'Satışta',
-            value: availableUnits,
-            color: 'text-amber-400',
-            bg: 'bg-amber-500/10',
-            border: 'border-amber-500/20',
-          },
-          {
-            icon: <Coins className="w-4 h-4" />,
-            label: 'Beklenen Gelir',
-            value: formatCurrency(expectedRevenue),
-            color: 'text-sky-400',
-            bg: 'bg-sky-500/10',
-            border: 'border-sky-500/20',
-          },
-          {
-            icon: <TrendingUp className="w-4 h-4" />,
-            label: 'Gerçekleşen Gelir',
-            value: formatCurrency(actualRevenue),
-            color: 'text-violet-400',
-            bg: 'bg-violet-500/10',
-            border: 'border-violet-500/20',
-          },
-        ].map((card, i) => (
-          <div
-            key={i}
-            className={`${card.bg} border ${card.border} rounded-2xl p-4 flex flex-col gap-1.5`}
-          >
-            <div className={`flex items-center gap-2 text-xs font-semibold ${card.color}`}>
-              {card.icon}
-              <span>{card.label}</span>
-            </div>
-            <p className={`text-xl font-extrabold ${card.color} leading-tight`}>
-              {card.value}
-            </p>
-          </div>
-        ))}
-      </div>}
-
-      {/* ── Satış Kontrol Paneli ── */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-5">
-        {/* Toggle */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Tag className="w-4 h-4 text-amber-400" />
-              Satış Sistemi
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Bu proje için daire satışını açın veya kapatın.
-            </p>
-          </div>
-          <button
-            onClick={toggleSalesEnabled}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-              project.sales_enabled
-                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30'
-                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
-            }`}
-          >
-            {project.sales_enabled ? (
-              <>
-                <ToggleRight className="w-4 h-4" />
-                Satış Açık
-              </>
-            ) : (
-              <>
-                <ToggleLeft className="w-4 h-4" />
-                Satış Kapalı
-              </>
-            )}
-          </button>
+      {toastMsg && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-amber-500 text-slate-950 px-6 py-3 rounded-2xl shadow-2xl font-bold text-xs flex items-center gap-3 border border-amber-300 backdrop-blur-md animate-bounce">
+          <span>{toastMsg}</span>
+          <button onClick={() => setToastMsg(null)} className="ml-2 font-black text-sm">✕</button>
         </div>
-
-        {/* Genel Fiyat */}
-        {project.sales_enabled && (() => {
-          const savedFormatted = project.default_sale_price
-            ? project.default_sale_price.toLocaleString('tr-TR')
-            : '';
-          const isDefaultDirty = defaultPriceInput !== savedFormatted;
-          return (
-          <div className="border-t border-slate-800 pt-4">
-            <label className="text-xs font-semibold text-slate-300 flex items-center gap-2 mb-2">
-              <Layers className="w-3.5 h-3.5 text-amber-400" />
-              Genel (Varsayılan) Satış Fiyatı
-              <span className="text-slate-500 font-normal">— tüm dairelere uygulanır</span>
-            </label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 font-bold text-sm">₺</span>
-                <input
-                  type="text"
-                  value={defaultPriceInput}
-                  onChange={(e) => setDefaultPriceInput(formatPriceInput(e.target.value))}
-                  onBlur={applyDefaultPrice}
-                  onKeyDown={(e) => e.key === 'Enter' && applyDefaultPrice()}
-                  placeholder="örn. 3.500.000"
-                  className="w-full bg-slate-800 border border-slate-700 focus:border-amber-500/60 focus:outline-none text-white placeholder-slate-600 text-sm font-semibold rounded-xl pl-8 pr-4 py-2.5 transition"
-                />
-              </div>
-              <button
-                onClick={applyDefaultPrice}
-                disabled={!isDefaultDirty}
-                className={`px-4 py-2 font-bold text-xs rounded-xl transition ${
-                  isDefaultDirty
-                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer'
-                    : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'
-                }`}
+      )}
+      {/* ── Özet Kartları ── */}
+      {project.sales_enabled && (
+        <div className={`grid gap-3 ${isReadOnly ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 lg:grid-cols-5'}`}>
+          {[
+            {
+              icon: <Home className="w-4 h-4" />,
+              label: 'Toplam Mülkiyet',
+              value: totalUnits,
+              color: 'text-slate-300',
+              bg: 'bg-slate-800/60',
+              border: 'border-slate-700/50',
+              showInReadOnly: true,
+            },
+            {
+              icon: <BadgeCheck className="w-4 h-4" />,
+              label: 'Satılan',
+              value: soldUnits,
+              color: 'text-emerald-400',
+              bg: 'bg-emerald-500/10',
+              border: 'border-emerald-500/20',
+              showInReadOnly: true,
+            },
+            {
+              icon: <ShoppingCart className="w-4 h-4" />,
+              label: 'Satışta',
+              value: availableUnits,
+              color: 'text-amber-400',
+              bg: 'bg-amber-500/10',
+              border: 'border-amber-500/20',
+              showInReadOnly: true,
+            },
+            {
+              icon: <Coins className="w-4 h-4" />,
+              label: 'Beklenen Gelir',
+              value: formatCurrency(expectedRevenue),
+              color: 'text-sky-400',
+              bg: 'bg-sky-500/10',
+              border: 'border-sky-500/20',
+              showInReadOnly: false,
+            },
+            {
+              icon: <TrendingUp className="w-4 h-4" />,
+              label: 'Gerçekleşen Gelir',
+              value: formatCurrency(actualRevenue),
+              color: 'text-violet-400',
+              bg: 'bg-violet-500/10',
+              border: 'border-violet-500/20',
+              showInReadOnly: false,
+            },
+          ]
+            .filter((card) => !isReadOnly || card.showInReadOnly)
+            .map((card, i) => (
+              <div
+                key={i}
+                className={`${card.bg} border ${card.border} rounded-2xl p-4 flex flex-col gap-1.5`}
               >
-                Uygula
-              </button>
-            </div>
-            {project.default_sale_price ? (
-              <p className="text-xs text-emerald-400 mt-1.5 font-medium">
-                ✓ Genel fiyat: {formatCurrency(project.default_sale_price)}
+                <div className={`flex items-center gap-2 text-xs font-semibold ${card.color}`}>
+                  {card.icon}
+                  <span>{card.label}</span>
+                </div>
+                <p className={`text-xl font-extrabold ${card.color} leading-tight`}>
+                  {card.value}
+                </p>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {/* ── Satış Kontrol Paneli (Yalnızca Düzenleme Yetkili Proje Sahibi) ── */}
+      {!isReadOnly && (
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-5">
+          {/* Toggle */}
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Tag className="w-4 h-4 text-amber-400" />
+                Satış Sistemi
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Bu proje için daire satışını açın veya kapatın.
               </p>
-            ) : null}
+            </div>
+            <button
+              onClick={toggleSalesEnabled}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                project.sales_enabled
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+              }`}
+            >
+              {project.sales_enabled ? (
+                <>
+                  <ToggleRight className="w-4 h-4" />
+                  Satış Açık
+                </>
+              ) : (
+                <>
+                  <ToggleLeft className="w-4 h-4" />
+                  Satış Kapalı
+                </>
+              )}
+            </button>
           </div>
-          );
-        })()}
-      </div>
+
+          {/* Genel Fiyat */}
+          {project.sales_enabled && (() => {
+            const savedFormatted = project.default_sale_price
+              ? project.default_sale_price.toLocaleString('tr-TR')
+              : '';
+            const isDefaultDirty = defaultPriceInput !== savedFormatted;
+            return (
+              <div className="border-t border-slate-800 pt-4">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-2 mb-2">
+                  <Layers className="w-3.5 h-3.5 text-amber-400" />
+                  Genel (Varsayılan) Satış Fiyatı
+                  <span className="text-slate-500 font-normal">— tüm dairelere uygulanır</span>
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 font-bold text-sm">₺</span>
+                    <input
+                      type="text"
+                      value={defaultPriceInput}
+                      onChange={(e) => setDefaultPriceInput(formatPriceInput(e.target.value))}
+                      onBlur={applyDefaultPrice}
+                      onKeyDown={(e) => e.key === 'Enter' && applyDefaultPrice()}
+                      placeholder="örn. 3.500.000"
+                      className="w-full bg-slate-800 border border-slate-700 focus:border-amber-500/60 focus:outline-none text-white placeholder-slate-600 text-sm font-semibold rounded-xl pl-8 pr-4 py-2.5 transition"
+                    />
+                  </div>
+                  <button
+                    onClick={applyDefaultPrice}
+                    disabled={!isDefaultDirty}
+                    className={`px-4 py-2 font-bold text-xs rounded-xl transition ${
+                      isDefaultDirty
+                        ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer'
+                        : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    Uygula
+                  </button>
+                </div>
+                {project.default_sale_price ? (
+                  <p className="text-xs text-emerald-400 mt-1.5 font-medium">
+                    ✓ Genel fiyat: {formatCurrency(project.default_sale_price)}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* ── Kat & Daire Listesi ── */}
       {project.sales_enabled && (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { getProjectUnitCount, type Project, type UserRole } from '../types';
+import { getProjectFloorsCount, getUnitsPerFloor } from '../utils/floorUtils';
 import {
   Building2,
   MapPin,
@@ -13,34 +14,6 @@ import {
   Tag,
   CalendarCheck,
 } from 'lucide-react';
-
-export const getProjectFloorsCount = (project: Project): number => {
-  if (project.floors && project.floors.length > 0) {
-    return project.floors.length;
-  }
-  const match = project.description?.match(/(\d+)\s*Kat/i);
-  if (match && match[1]) {
-    return parseInt(match[1], 10);
-  }
-  const units = getProjectUnitCount(project);
-  if (units > 0) return Math.max(1, Math.ceil(units / 2));
-  return 1;
-};
-
-export const getUnitsPerFloor = (project: Project): number => {
-  if (project.floors && project.floors.length > 0) {
-    const floorWithUnits = project.floors.find((f) => f.units && f.units.length > 0);
-    if (floorWithUnits?.units?.length) {
-      return floorWithUnits.units.length;
-    }
-  }
-  const totalFloors = getProjectFloorsCount(project);
-  const totalUnits = getProjectUnitCount(project);
-  if (totalFloors > 0 && totalUnits > 0) {
-    return Math.max(1, Math.round(totalUnits / totalFloors));
-  }
-  return 2;
-};
 
 interface ProjectCardGridProps {
   projects: Project[];

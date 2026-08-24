@@ -189,6 +189,7 @@ interface CustomTypologySelectProps {
   totalFloors: number;
   onOpen?: () => void;
   onChange: (value: FloorTypology) => void;
+  disabled?: boolean;
 }
 
 export const CustomTypologySelect: React.FC<CustomTypologySelectProps> = ({
@@ -197,6 +198,7 @@ export const CustomTypologySelect: React.FC<CustomTypologySelectProps> = ({
   totalFloors,
   onOpen,
   onChange,
+  disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -223,17 +225,22 @@ export const CustomTypologySelect: React.FC<CustomTypologySelectProps> = ({
     <div className="relative w-full" ref={containerRef}>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => {
+          if (disabled) return;
           const nextState = !isOpen;
           setIsOpen(nextState);
           if (nextState && onOpen) {
             onOpen();
           }
         }}
-        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition cursor-pointer shadow-inner ${isOpen
-            ? 'border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/10'
-            : 'border-amber-500/40 hover:border-amber-400 hover:bg-slate-900'
-          }`}
+        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition shadow-inner ${
+          disabled
+            ? 'opacity-60 cursor-not-allowed border-slate-800'
+            : isOpen
+              ? 'border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/10 cursor-pointer'
+              : 'border-amber-500/40 hover:border-amber-400 hover:bg-slate-900 cursor-pointer'
+        }`}
       >
         <div className="flex items-center gap-3 overflow-hidden">
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${selectedInfo.badgeStyle}`}>
@@ -300,6 +307,7 @@ interface CustomUnitCountSelectProps {
   floorNumber?: number;
   onOpen?: () => void;
   onChange: (count: number) => void;
+  disabled?: boolean;
 }
 
 export const CustomUnitCountSelect: React.FC<CustomUnitCountSelectProps> = ({
@@ -308,6 +316,7 @@ export const CustomUnitCountSelect: React.FC<CustomUnitCountSelectProps> = ({
   floorNumber = 1,
   onOpen,
   onChange,
+  disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -329,17 +338,22 @@ export const CustomUnitCountSelect: React.FC<CustomUnitCountSelectProps> = ({
     <div className="relative w-full" ref={containerRef}>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => {
+          if (disabled) return;
           const nextState = !isOpen;
           setIsOpen(nextState);
           if (nextState && onOpen) {
             onOpen();
           }
         }}
-        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition cursor-pointer shadow-inner ${isOpen
-            ? 'border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/10'
-            : 'border-slate-700 hover:border-slate-600 hover:bg-slate-900'
-          }`}
+        className={`w-full h-12 bg-slate-900/95 border rounded-xl px-4 text-sm text-white flex items-center justify-between transition shadow-inner ${
+          disabled
+            ? 'opacity-60 cursor-not-allowed border-slate-800'
+            : isOpen
+              ? 'border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-500/10 cursor-pointer'
+              : 'border-slate-700 hover:border-slate-600 hover:bg-slate-900 cursor-pointer'
+        }`}
       >
         <span className="font-bold text-slate-200 text-xs sm:text-sm">
           {unitCount} Adet {unitPrefix}
@@ -394,19 +408,37 @@ interface BuildingViewerProps {
   onToggleUnitStage?: (unitId: string, stageId: string, isCompleted: boolean) => void;
   onUpdateProject?: (updated: Project) => void;
   isContractor?: boolean;
+  isGuest?: boolean;
+  isReadOnly?: boolean;
 }
 
 export const BuildingViewer: React.FC<BuildingViewerProps> = ({
   project,
   floors = [],
-  onToggleFloorStage,
-  onToggleUnitStage,
+  onToggleFloorStage: rawToggleFloorStage,
+  onToggleUnitStage: rawToggleUnitStage,
   onUpdateProject,
   isContractor = true,
+  isGuest = false,
+  isReadOnly = false,
 }) => {
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const onToggleFloorStage = (floorId: string, stageId: string, isCompleted: boolean) => {
+    if (isGuest || isReadOnly) {
+      return;
+    }
+    if (rawToggleFloorStage) rawToggleFloorStage(floorId, stageId, isCompleted);
+  };
+
+  const onToggleUnitStage = (unitId: string, stageId: string, isCompleted: boolean) => {
+    if (isGuest || isReadOnly) {
+      return;
+    }
+    if (rawToggleUnitStage) rawToggleUnitStage(unitId, stageId, isCompleted);
+  };
 
   const storageKey = `golgeden_bina_ayarlari_${project?.id || 'default'}`;
   const roofStorageKey = `golgeden_roof_completed_${project?.id || 'default'}`;
@@ -504,6 +536,11 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
   }, [project?.id, floors]);
 
   const saveTypologies = (newMap: Record<string, FloorTypologyConfig>) => {
+    if (isGuest) {
+      setToastMessage('⚠️ Misafir Modu: Misafir kullanıcılar bina ayarlarını değiştiremez. Lütfen Giriş Yapın.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
     setFloorTypologies(newMap);
     try {
       localStorage.setItem(storageKey, JSON.stringify(newMap));
@@ -536,6 +573,11 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
 
   // Add a single floor above the selected floor (or at the top if none selected)
   const handleAddFloorAbove = () => {
+    if (isGuest) {
+      setToastMessage('⚠️ Misafir Modu: Misafir kullanıcılar kat ekleyemez. Lütfen Giriş Yapın.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
     if (!project || !onUpdateProject) return;
     const projectId = project.id;
     const ts = Date.now();
@@ -685,6 +727,11 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
 
   // Delete the currently selected floor
   const handleDeleteSelectedFloor = () => {
+    if (isGuest) {
+      setToastMessage('⚠️ Misafir Modu: Misafir kullanıcılar kat silemez. Lütfen Giriş Yapın.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
     if (!project || !onUpdateProject || !selectedFloorId) return;
     const target = floors.find((f) => f.id === selectedFloorId);
     if (!target) return;
@@ -763,6 +810,61 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
 
     const isTopDuplexUpper = floor.floor_number === totalFloors && typoConfig.type === 'duplex' && totalFloors > 1;
 
+    const getUnitDefaultStages = (unitId: string, floorId: string, isCompleted: boolean = false) => [
+      {
+        id: `${unitId}-st1`,
+        project_id: project?.id || '',
+        floor_id: floorId,
+        unit_id: unitId,
+        name: 'Tuğla Duvar, Bölmeler & Kara Sıva',
+        category: 'ince_isler',
+        estimated_cost: 45000,
+        actual_cost: isCompleted ? 45000 : 0,
+        weight_percentage: 25,
+        is_completed: isCompleted,
+        order_index: 1,
+      },
+      {
+        id: `${unitId}-st2`,
+        project_id: project?.id || '',
+        floor_id: floorId,
+        unit_id: unitId,
+        name: 'Elektrik & Su Tesisatı Altyapısı',
+        category: 'tesisat',
+        estimated_cost: 35000,
+        actual_cost: isCompleted ? 35000 : 0,
+        weight_percentage: 25,
+        is_completed: isCompleted,
+        order_index: 2,
+      },
+      {
+        id: `${unitId}-st3`,
+        project_id: project?.id || '',
+        floor_id: floorId,
+        unit_id: unitId,
+        name: 'Zemin Şapı, Seramik & Parke Kaplama',
+        category: 'ince_isler',
+        estimated_cost: 50000,
+        actual_cost: isCompleted ? 50000 : 0,
+        weight_percentage: 25,
+        is_completed: isCompleted,
+        order_index: 3,
+      },
+      {
+        id: `${unitId}-st4`,
+        project_id: project?.id || '',
+        floor_id: floorId,
+        unit_id: unitId,
+        name: 'Mutfak & Banyo Dolapları, Boya & Armatür',
+        category: 'ince_isler',
+        estimated_cost: 40000,
+        actual_cost: isCompleted ? 40000 : 0,
+        weight_percentage: 25,
+        is_completed: isCompleted,
+        order_index: 4,
+      },
+    ];
+
     const result: Unit[] = [];
     for (let i = 1; i <= targetCount; i++) {
       const unitNum = floor.floor_number * 100 + i;
@@ -773,46 +875,26 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
       }
 
       if (i <= existingUnits.length) {
+        const u = existingUnits[i - 1];
+        const uStages = u.stages && u.stages.length > 0
+          ? u.stages
+          : getUnitDefaultStages(u.id, floor.id, u.is_completed);
+
         result.push({
-          ...existingUnits[i - 1],
+          ...u,
           name: unitName,
           unit_number: unitNum,
+          stages: uStages,
         });
       } else {
+        const dynId = `${floor.id}-dyn-unit-${i}`;
         result.push({
-          id: `${floor.id}-dyn-unit-${i}`,
+          id: dynId,
           floor_id: floor.id,
           unit_number: unitNum,
           name: unitName,
           is_completed: false,
-          stages: [
-            {
-              id: `${floor.id}-dyn-unit-${i}-st1`,
-              project_id: project?.id || '',
-              floor_id: floor.id,
-              unit_id: `${floor.id}-dyn-unit-${i}`,
-              name: 'Sıva, Şap & Seramik Kaplama',
-              category: 'ince_isler',
-              estimated_cost: 45000,
-              actual_cost: 0,
-              weight_percentage: 50,
-              is_completed: false,
-              order_index: 1,
-            },
-            {
-              id: `${floor.id}-dyn-unit-${i}-st2`,
-              project_id: project?.id || '',
-              floor_id: floor.id,
-              unit_id: `${floor.id}-dyn-unit-${i}`,
-              name: 'Boya, Aydınlatma & Armatür Montajı',
-              category: 'ince_isler',
-              estimated_cost: 35000,
-              actual_cost: 0,
-              weight_percentage: 50,
-              is_completed: false,
-              order_index: 2,
-            },
-          ],
+          stages: getUnitDefaultStages(dynId, floor.id, false),
         });
       }
     }
@@ -888,7 +970,7 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
         className="mt-5 pt-5 border-t border-slate-800/80 space-y-6 animate-fadeIn text-left"
         onClick={(e) => e.stopPropagation()}
       >
-        {toastMessage && (
+        {!isReadOnly && toastMessage && (
           <div className="p-3 bg-rose-500/20 border border-rose-500/50 rounded-xl flex items-center justify-between text-rose-200 text-xs animate-shake">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
@@ -918,7 +1000,7 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                 const isLocked = !stage.is_completed && !depStatus.isUnlocked;
 
                 const handleStageClick = () => {
-                  if (!isContractor) return;
+                  if (!isContractor || isReadOnly) return;
                   if (isLocked) {
                     setToastMessage(depStatus.reason || 'Bu aşama kilitlidir.');
                     return;
@@ -1044,82 +1126,126 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
         </div>
 
         {/* Selected Unit Stage Inspector Sub-panel */}
-        {selectedUnit && selectedUnit.floor_id === floor.id && (
-          <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 mt-4 animate-fadeIn">
-            <div className="flex justify-between items-center mb-3 border-b border-slate-800 pb-2">
-              <h5 className="font-bold text-sm text-amber-300">
-                {selectedUnit.name} İmalat Aşamaları
-              </h5>
-              <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30">
-                {selectedUnit.is_completed ? 'Tamamlandı' : 'Süreçte'}
-              </span>
-            </div>
+        {selectedUnit && selectedUnit.floor_id === floor.id && (() => {
+          const unitStages = selectedUnit.stages && selectedUnit.stages.length > 0
+            ? selectedUnit.stages
+            : [];
+          const doneCount = unitStages.filter((s) => s.is_completed).length;
+          const totalCount = unitStages.length;
+          const unitPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : (selectedUnit.is_completed ? 100 : 0);
 
-            {selectedUnit?.stages && selectedUnit.stages.length > 0 ? (
-              <div className="space-y-2">
-                {selectedUnit.stages.map((st) => {
-                  const unitDep = project
-                    ? checkUnitStageStatus(project, selectedUnit.id, st.id)
-                    : { isUnlocked: true };
-                  const isUnitStLocked = !st.is_completed && !unitDep.isUnlocked;
+          return (
+            <div className="bg-slate-950/90 border border-amber-500/30 rounded-2xl p-4 mt-4 animate-fadeIn shadow-xl">
+              {/* Header Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-slate-800 pb-3">
+                <div>
+                  <h5 className="font-extrabold text-sm text-amber-300 flex items-center gap-2">
+                    <span>{selectedUnit.name} İç İmalat & Bölüm Aşamaları</span>
+                  </h5>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Daire içi ince işler, altyapı ve mimari bölümlerin tamamlanma durumları
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] bg-slate-900 text-amber-400 font-bold px-2.5 py-1 rounded-xl border border-amber-500/30">
+                    {doneCount} / {totalCount} Bölüm Tamamlandı (%{unitPct})
+                  </span>
+                </div>
+              </div>
 
-                  const handleUnitStageClick = () => {
-                    if (!isContractor) return;
-                    if (isUnitStLocked) {
-                      setToastMessage(unitDep.reason || 'Bu birim imalatı kilitlidir.');
-                      return;
-                    }
-                    setToastMessage(null);
-                    onToggleUnitStage?.(selectedUnit.id, st.id, !st.is_completed);
-                  };
+              {/* Progress Bar */}
+              <div className="mb-4 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800/80">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-full transition-all duration-500"
+                    style={{ width: `${unitPct}%` }}
+                  />
+                </div>
+              </div>
 
-                  return (
-                    <div
-                      key={st.id}
-                      onClick={handleUnitStageClick}
-                      className={`flex items-center justify-between text-xs p-2.5 rounded-lg border transition-all ${isUnitStLocked
-                          ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
-                          : st.is_completed
-                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/90'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${isUnitStLocked
-                              ? 'border-slate-700 bg-slate-950 text-slate-600 cursor-not-allowed'
-                              : st.is_completed
-                                ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer'
-                                : 'border-slate-600 cursor-pointer'
-                            }`}
-                        >
-                          {st.is_completed ? (
-                            <CheckCircle2 key="uchk-completed" className="w-3 h-3 stroke-[3]" />
-                          ) : isUnitStLocked ? (
-                            <Lock key="uchk-locked" className="w-2.5 h-2.5 text-slate-500" />
-                          ) : null}
-                        </span>
-                        <span className="text-white font-medium flex items-center gap-1.5">
-                          <span>{st.name}</span>
-                          {isUnitStLocked && (
-                            <span className="text-[9px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1 py-0.2 rounded flex items-center gap-0.5">
-                              <Lock className="w-2 h-2" /> Kilitli
+              {/* Stages List */}
+              {unitStages.length > 0 ? (
+                <div className="space-y-2.5">
+                  {unitStages.map((st) => {
+                    const unitDep = project
+                      ? checkUnitStageStatus(project, selectedUnit.id, st.id)
+                      : { isUnlocked: true };
+                    const isUnitStLocked = !st.is_completed && !unitDep.isUnlocked;
+
+                    const handleUnitStageClick = () => {
+                      if (!isContractor || isReadOnly) return;
+                      if (isUnitStLocked) {
+                        setToastMessage(unitDep.reason || 'Bu birim imalatı kilitlidir.');
+                        return;
+                      }
+                      setToastMessage(null);
+                      onToggleUnitStage?.(selectedUnit.id, st.id, !st.is_completed);
+                    };
+
+                    return (
+                      <div
+                        key={st.id}
+                        onClick={handleUnitStageClick}
+                        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs p-3 rounded-xl border transition-all ${isUnitStLocked
+                            ? 'bg-slate-950/60 border-slate-800 text-slate-600 opacity-80 cursor-not-allowed'
+                            : st.is_completed
+                              ? 'bg-amber-500/10 border-amber-500/40 text-amber-200 shadow-sm shadow-amber-500/10 cursor-pointer hover:border-amber-500/60 hover:bg-slate-900'
+                              : 'bg-slate-900 border-slate-800/90 text-slate-400 cursor-pointer hover:border-amber-500/60 hover:bg-slate-800/80'
+                          }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 ${isUnitStLocked
+                                ? 'border-slate-700 bg-slate-950 text-slate-600 cursor-not-allowed'
+                                : st.is_completed
+                                  ? 'bg-amber-500 border-amber-400 text-slate-950 cursor-pointer font-black'
+                                  : 'border-slate-600 bg-slate-950 hover:border-amber-400 cursor-pointer'
+                              }`}
+                          >
+                            {st.is_completed ? (
+                              <CheckCircle2 key="uchk-completed" className="w-3.5 h-3.5 stroke-[3]" />
+                            ) : isUnitStLocked ? (
+                              <Lock key="uchk-locked" className="w-3 h-3 text-slate-500" />
+                            ) : null}
+                          </span>
+                          <div>
+                            <span className="text-white font-bold flex items-center gap-1.5">
+                              <span>{st.name}</span>
+                            </span>
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              Tahmini Bütçe: {(st.estimated_cost || 0).toLocaleString('tr-TR')} ₺
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          {isUnitStLocked ? (
+                            <span className="bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
+                              <Lock className="w-2.5 h-2.5" /> Kat Kilitli
+                            </span>
+                          ) : st.is_completed ? (
+                            <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1">
+                              ✓ Tamamlandı
+                            </span>
+                          ) : (
+                            <span className="bg-slate-950 text-amber-400/80 border border-slate-800 text-[10px] font-semibold px-2.5 py-1 rounded-full">
+                              ⏳ Yapılmadı / Gölge
                             </span>
                           )}
-                        </span>
+                        </div>
                       </div>
-                      <span className="text-slate-400">{(st.estimated_cost || 0).toLocaleString('tr-TR')} ₺</span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-xs text-slate-400 italic text-center py-2">
-                Bu birim için standart ince işler aşamaları otomatik tanımlanmıştır.
-              </div>
-            )}
-          </div>
-        )}
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-xs text-slate-400 italic text-center py-2">
+                  Bu birim için standart ince işler aşamaları otomatik tanımlanmıştır.
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -1152,31 +1278,33 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
         </div>
 
         {/* TOP RIGHT: Building Settings Toggle Button */}
-        <button
-          onClick={toggleSettingsMode}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg cursor-pointer backdrop-blur-md shrink-0 border ${isSettingsMode
-              ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 border-amber-300 text-slate-950 shadow-amber-500/30 font-black'
-              : 'bg-slate-900 border-slate-700 text-amber-300 hover:border-amber-500/50 hover:bg-slate-800'
-            }`}
-        >
-          {isSettingsMode ? (
-            <>
-              <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
-              <span>Ayarları Kapat</span>
-            </>
-          ) : (
-            <>
-              <SlidersHorizontal className="w-4 h-4 text-amber-400" />
-              <span>Bina Ayarları</span>
-            </>
-          )}
-        </button>
+        {!isReadOnly && !isGuest && (
+          <button
+            onClick={toggleSettingsMode}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition shadow-lg cursor-pointer backdrop-blur-md shrink-0 border ${isSettingsMode
+                ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 border-amber-300 text-slate-950 shadow-amber-500/30 font-black'
+                : 'bg-slate-900 border-slate-700 text-amber-300 hover:border-amber-500/50 hover:bg-slate-800'
+              }`}
+          >
+            {isSettingsMode ? (
+              <>
+                <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
+                <span>Ayarları Kapat</span>
+              </>
+            ) : (
+              <>
+                <SlidersHorizontal className="w-4 h-4 text-amber-400" />
+                <span>Bina Ayarları</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Main Building Stack View */}
       <div className="w-full max-w-5xl mx-auto flex flex-col items-center">
         {/* Toast Warning Alert Notification */}
-        {toastMessage && (
+        {!isReadOnly && toastMessage && (
           <div className="w-full mb-4 p-3.5 bg-rose-500/20 border border-rose-500/50 rounded-2xl flex items-center justify-between text-rose-200 text-xs sm:text-sm font-medium animate-shake shadow-lg shadow-rose-950/40 backdrop-blur-md">
             <div className="flex items-center gap-2.5">
               <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
@@ -1228,16 +1356,18 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setNewUnitsPerFloor((v) => Math.max(1, v - 1))}
-                    className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-bold text-base flex items-center justify-center hover:border-amber-500 hover:text-amber-300 active:scale-90 transition cursor-pointer"
+                    disabled={isGuest}
+                    onClick={() => !isGuest && setNewUnitsPerFloor((v) => Math.max(1, v - 1))}
+                    className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-bold text-base flex items-center justify-center hover:border-amber-500 hover:text-amber-300 active:scale-90 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   >−</button>
                   <div className="w-8 text-center">
                     <span className="text-xl font-black text-amber-400">{newUnitsPerFloor}</span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setNewUnitsPerFloor((v) => Math.min(4, v + 1))}
-                    className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-bold text-base flex items-center justify-center hover:border-amber-500 hover:text-amber-300 active:scale-90 transition cursor-pointer"
+                    disabled={isGuest}
+                    onClick={() => !isGuest && setNewUnitsPerFloor((v) => Math.min(4, v + 1))}
+                    className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-bold text-base flex items-center justify-center hover:border-amber-500 hover:text-amber-300 active:scale-90 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   >+</button>
                 </div>
               </div>
@@ -1246,7 +1376,7 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
               <button
                 type="button"
                 onClick={handleAddFloorAbove}
-                disabled={!onUpdateProject}
+                disabled={isGuest || !onUpdateProject}
                 className="flex-1 flex flex-row items-center justify-center gap-3 py-3.5 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm transition shadow-lg shadow-amber-500/20 active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <PlusCircle className="w-5 h-5 shrink-0" />
@@ -1269,7 +1399,7 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
               <button
                 type="button"
                 onClick={handleDeleteSelectedFloor}
-                disabled={!onUpdateProject || !selectedFloorId}
+                disabled={isGuest || !onUpdateProject || !selectedFloorId}
                 className="flex-1 flex flex-row items-center justify-center gap-3 py-3.5 px-5 rounded-xl border transition active:scale-[0.98] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed
                     bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20 hover:border-rose-500/50"
               >
@@ -1483,8 +1613,10 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                                 value={effectiveTypeKey}
                                 floorNumber={floor.floor_number}
                                 totalFloors={totalFloors}
+                                disabled={isGuest}
                                 onOpen={() => setSelectedFloorId(floor.id)}
                                 onChange={(newType) => {
+                                  if (isGuest) return;
                                   setSelectedFloorId(floor.id);
                                   const updated = {
                                     ...floorTypologies,
@@ -1507,8 +1639,10 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                                 unitCount={currentTypo.unitCount ?? (floor.units?.length || newUnitsPerFloor)}
                                 unitPrefix={typoInfo.unitPrefix}
                                 floorNumber={floor.floor_number}
+                                disabled={isGuest}
                                 onOpen={() => setSelectedFloorId(floor.id)}
                                 onChange={(count) => {
+                                  if (isGuest) return;
                                   setSelectedFloorId(floor.id);
                                   const updated = {
                                     ...floorTypologies,
@@ -1643,8 +1777,10 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                               value={effectiveTypeKey}
                               floorNumber={floor.floor_number}
                               totalFloors={totalFloors}
+                              disabled={isGuest}
                               onOpen={() => setSelectedFloorId(floor.id)}
                               onChange={(newType) => {
+                                if (isGuest) return;
                                 setSelectedFloorId(floor.id);
                                 const updated = {
                                   ...floorTypologies,
@@ -1667,8 +1803,10 @@ export const BuildingViewer: React.FC<BuildingViewerProps> = ({
                               unitCount={currentTypo.unitCount ?? (floor.units?.length || newUnitsPerFloor)}
                               unitPrefix={typoInfo.unitPrefix}
                               floorNumber={floor.floor_number}
+                              disabled={isGuest}
                               onOpen={() => setSelectedFloorId(floor.id)}
                               onChange={(count) => {
+                                if (isGuest) return;
                                 setSelectedFloorId(floor.id);
                                 const updated = {
                                   ...floorTypologies,

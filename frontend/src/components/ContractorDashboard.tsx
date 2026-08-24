@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import type { Project, ExpenseCategory, VisibilityType, Expense } from '../types';
 import {
   PlusCircle,
-  Receipt,
   Shield,
   Eye,
   Lock,
@@ -87,20 +86,61 @@ interface ContractorDashboardProps {
   onCreateNewProject: (projectData: any) => void;
   onDeleteProject?: (projectId: string) => void;
   initialTab?: 'expenses' | 'settings' | 'stages';
+  isGuest?: boolean;
+  isReadOnly?: boolean;
 }
 
 export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
   project,
-  onUpdateVisibility,
-  onUpdateProjectSettings,
-  onAddExpense,
-  onToggleStage,
-  onCreateNewProject,
-  onDeleteProject,
+  onUpdateVisibility: rawUpdateVisibility,
+  onUpdateProjectSettings: rawUpdateProjectSettings,
+  onAddExpense: rawAddExpense,
+  onToggleStage: rawToggleStage,
+  onCreateNewProject: rawCreateNewProject,
+  onDeleteProject: rawDeleteProject,
   initialTab = 'expenses',
+  isGuest = false,
+  isReadOnly = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'expenses' | 'settings' | 'stages'>(initialTab);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showReadOnlyWarning = (actionName: string) => {
+    if (isGuest) {
+      setToastMessage(`⚠️ Misafir Modu: ${actionName} işlemi misafirlere engellenmiştir. Lütfen Giriş Yapın.`);
+      setTimeout(() => setToastMessage(null), 4000);
+    }
+  };
+
+  const onUpdateVisibility = (visibility: VisibilityType, showFinancials: boolean) => {
+    if (isGuest || isReadOnly) { showReadOnlyWarning('Görünürlük değiştirme'); return; }
+    rawUpdateVisibility(visibility, showFinancials);
+  };
+
+  const onUpdateProjectSettings = (settingsData: Partial<Project>) => {
+    if (isGuest || isReadOnly) { showReadOnlyWarning('Ayar güncelleme'); return; }
+    if (rawUpdateProjectSettings) rawUpdateProjectSettings(settingsData);
+  };
+
+  const onAddExpense = (expense: Partial<Expense>) => {
+    if (isGuest || isReadOnly) { showReadOnlyWarning('Masraf ekleme'); return; }
+    rawAddExpense(expense);
+  };
+
+  const onToggleStage = (stageId: string, isCompleted: boolean) => {
+    if (isGuest || isReadOnly) { return; }
+    rawToggleStage(stageId, isCompleted);
+  };
+
+  const onCreateNewProject = (projectData: any) => {
+    if (isGuest) { showReadOnlyWarning('Yeni proje oluşturma'); return; }
+    rawCreateNewProject(projectData);
+  };
+
+  const onDeleteProject = (projectId: string) => {
+    if (isGuest || isReadOnly) { showReadOnlyWarning('Proje silme'); return; }
+    if (rawDeleteProject) rawDeleteProject(projectId);
+  };
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -159,16 +199,17 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
   const parsedSalePrice = parseFloat(defaultSalePrice.replace(/\./g, '')) || 0;
 
   const hasSettingsChanged =
-    name.trim() !== (project.name || '') ||
-    location.trim() !== (project.location || '') ||
-    description.trim() !== (project.description || '') ||
-    parsedBudget !== (project.total_budget || 0) ||
-    status !== (project.status || 'planning') ||
-    completionMonths !== (project.estimated_completion_months || 24) ||
-    visibility !== (project.visibility || 'public') ||
-    showFinancials !== (project.show_financials_to_clients || false) ||
-    parsedSalePrice !== (project.default_sale_price || 0) ||
-    salesEnabled !== (project.sales_enabled ?? true);
+    !isGuest &&
+    (name.trim() !== (project.name || '') ||
+      location.trim() !== (project.location || '') ||
+      description.trim() !== (project.description || '') ||
+      parsedBudget !== (project.total_budget || 0) ||
+      status !== (project.status || 'planning') ||
+      completionMonths !== (project.estimated_completion_months || 24) ||
+      visibility !== (project.visibility || 'public') ||
+      showFinancials !== (project.show_financials_to_clients || false) ||
+      parsedSalePrice !== (project.default_sale_price || 0) ||
+      salesEnabled !== (project.sales_enabled ?? true));
 
   const formatNumberWithDots = (val: string): string => {
     const rawDigits = val.replace(/\D/g, '');
@@ -246,14 +287,26 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
       {/* Tab 1: Expense Logger & Expense History */}
       {activeTab === 'expenses' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* New Expense Form */}
+          {/* New Expense Form or ReadOnly Notice */}
           <div className="lg:col-span-5 bg-slate-950/80 border border-slate-800 rounded-2xl p-5">
-            <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <PlusCircle className="w-4 h-4 text-amber-500" />
-              Yeni Gider / Fatura Kaydı Gir
-            </h4>
+            {isReadOnly ? (
+              <div className="space-y-3 py-4 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/30 flex items-center justify-center mx-auto">
+                  <Eye className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-white">Salt Okunur İnceleme Modu</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Bu şantiyenin gider harcamaları şeffaf olarak kamuya açıktır. Yeni gider kaydı ekleme yetkisi yalnızca proje sahibi müteahhittedir.
+                </p>
+              </div>
+            ) : (
+              <>
+                <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                  <PlusCircle className="w-4 h-4 text-amber-500" />
+                  Yeni Gider / Fatura Kaydı Gir
+                </h4>
 
-            <form onSubmit={handleCreateExpense} className="space-y-4">
+                <form onSubmit={handleCreateExpense} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Gider Kategorisi</label>
                 <CustomCategorySelect
@@ -312,7 +365,9 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                 Gider Kaydını Sisteme İşle
               </button>
             </form>
-          </div>
+          </>
+        )}
+      </div>
 
           {/* Expense History Table */}
           <div className="lg:col-span-7 bg-slate-950/80 border border-slate-800 rounded-2xl p-5 flex flex-col">
@@ -390,7 +445,7 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
       {/* Tab 2: Project Level Stage Toggles */}
       {activeTab === 'stages' && (
         <div className="space-y-4">
-          {toastMessage && (
+          {!isReadOnly && toastMessage && (
             <div className="p-3 bg-rose-500/20 border border-rose-500/50 rounded-xl flex items-center justify-between text-rose-200 text-xs animate-shake">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
@@ -413,6 +468,7 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
               const isLocked = !st.is_completed && !depStatus.isUnlocked;
 
               const handleStageToggle = () => {
+                if (isReadOnly || isGuest) return;
                 if (isLocked) {
                   setToastMessage(depStatus.reason || 'Ön koşul aşaması tamamlanmalıdır.');
                   return;
@@ -518,6 +574,17 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
             )}
           </div>
 
+          {/* Guest Mode Notice Banner */}
+          {isGuest && (
+            <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center gap-3 text-xs text-cyan-300 shadow-lg animate-fadeIn">
+              <Lock className="w-5 h-5 text-cyan-400 shrink-0" />
+              <div>
+                <span className="font-bold block text-white text-sm">Misafir Modu (Salt Okunur)</span>
+                <span>Misafir oturumunda proje ayarları ve parametreleri kilitlidir. Ayarları değiştirmek için lütfen kayıtlı yönetici hesabı ile giriş yapın.</span>
+              </div>
+            </div>
+          )}
+
           {/* Toast Message */}
           {settingsSuccessMessage && (
             <div className="p-4 bg-emerald-500/20 border border-emerald-500/40 rounded-2xl flex items-center justify-between text-emerald-200 text-xs animate-fadeIn shadow-lg shadow-emerald-500/10">
@@ -552,10 +619,11 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                   <Building2 className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
+                    disabled={isGuest}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Örn: Zümrüt Kule Rezidans"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-950"
                   />
                 </div>
               </div>
@@ -569,10 +637,11 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                   <MapPin className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
+                    disabled={isGuest}
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Örn: Ataşehir, İstanbul"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-950"
                   />
                 </div>
               </div>
@@ -592,8 +661,13 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setStatus(item.id as any)}
-                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition cursor-pointer ${
+                    disabled={isGuest}
+                    onClick={() => !isGuest && setStatus(item.id as any)}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition ${
+                      isGuest
+                        ? 'opacity-60 cursor-not-allowed border-slate-800'
+                        : 'cursor-pointer'
+                    } ${
                       status === item.id
                         ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md'
                         : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
@@ -614,7 +688,8 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                 </label>
                 <CustomDurationSelect
                   value={completionMonths}
-                  onChange={(val) => setCompletionMonths(val)}
+                  disabled={isGuest}
+                  onChange={(val) => !isGuest && setCompletionMonths(val)}
                 />
               </div>
 
@@ -626,10 +701,11 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                   <FileText className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                   <textarea
                     rows={2}
+                    disabled={isGuest}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Proje hakkında kısa açıklama veya inşaat detayları..."
-                    className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition resize-none"
+                    className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition resize-none disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-950"
                   />
                 </div>
               </div>
@@ -653,38 +729,16 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                 <span className="text-slate-500 font-bold absolute left-3.5 top-1/2 -translate-y-1/2 text-sm">₺</span>
                 <input
                   type="text"
+                  disabled={isGuest}
                   value={totalBudget}
                   onChange={(e) => setTotalBudget(formatNumberWithDots(e.target.value))}
                   placeholder="50.000.000"
-                  className="w-full pl-8 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-bold text-amber-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                  className="w-full pl-8 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-bold text-amber-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-950"
                 />
               </div>
               <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
                 💡 Bütçeyi güncellediğinizde harcama sapması ve % finansal ilerleme oranları tüm platformda anında yeniden hesaplanır.
               </p>
-            </div>
-
-            {/* Müşteri Finans Privacy Switch */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-              <div className="space-y-1">
-                <div className="text-sm font-bold text-white flex items-center gap-2">
-                  <Receipt className="w-4 h-4 text-amber-400" />
-                  <span>Müşterilere Finansal Verileri Göster</span>
-                </div>
-                <p className="text-xs text-slate-400 max-w-sm">
-                  Kapalıyken müşteriler Bütçe, Harcama ve Gider detaylarını göremez.
-                </p>
-              </div>
-
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showFinancials}
-                  onChange={(e) => setShowFinancials(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500" />
-              </label>
             </div>
           </div>
 
@@ -706,8 +760,13 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                 <button
                   key={type}
                   type="button"
-                  onClick={() => setVisibility(type as VisibilityType)}
-                  className={`p-3.5 rounded-2xl border flex flex-col items-center text-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+                  disabled={isGuest}
+                  onClick={() => !isGuest && setVisibility(type as VisibilityType)}
+                  className={`p-3.5 rounded-2xl border flex flex-col items-center text-center gap-2 text-xs font-bold transition-all ${
+                    isGuest
+                      ? 'opacity-60 cursor-not-allowed border-slate-800'
+                      : 'cursor-pointer'
+                  } ${
                     visibility === type
                       ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md ring-1 ring-amber-400/30'
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
@@ -745,9 +804,10 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                   </p>
                 </div>
 
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label className={`relative inline-flex items-center ${isGuest ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                   <input
                     type="checkbox"
+                    disabled={isGuest}
                     checked={salesEnabled}
                     onChange={(e) => setSalesEnabled(e.target.checked)}
                     className="sr-only peer"
@@ -765,10 +825,11 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
                   <span className="text-slate-500 font-bold absolute left-3.5 top-1/2 -translate-y-1/2 text-sm">₺</span>
                   <input
                     type="text"
+                    disabled={isGuest}
                     value={defaultSalePrice}
                     onChange={(e) => setDefaultSalePrice(formatNumberWithDots(e.target.value))}
                     placeholder="3.500.000"
-                    className="w-full pl-8 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition"
+                    className="w-full pl-8 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-950"
                   />
                 </div>
               </div>
@@ -779,19 +840,23 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
           <div className="pt-2">
             <button
               type="button"
-              disabled={!hasSettingsChanged}
+              disabled={isGuest || !hasSettingsChanged}
               onClick={handleSaveSettings}
               className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm transition-all flex items-center justify-center gap-2.5 ${
-                hasSettingsChanged
-                  ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 shadow-xl shadow-amber-500/20 cursor-pointer ring-2 ring-amber-400/50 scale-[1.01]'
-                  : 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                isGuest
+                  ? 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                  : hasSettingsChanged
+                    ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 shadow-xl shadow-amber-500/20 cursor-pointer ring-2 ring-amber-400/50 scale-[1.01]'
+                    : 'bg-slate-900 border border-slate-800 text-slate-500 cursor-not-allowed opacity-60'
               }`}
             >
-              <Save className={`w-5 h-5 ${hasSettingsChanged ? 'text-slate-950 animate-bounce' : 'text-slate-500'}`} />
+              <Save className={`w-5 h-5 ${!isGuest && hasSettingsChanged ? 'text-slate-950 animate-bounce' : 'text-slate-500'}`} />
               <span>
-                {hasSettingsChanged
-                  ? 'Proje Ayarlarını Kaydet ve Tüm Sisteme Uygula'
-                  : 'Değişiklik Yok (Tüm Ayarlar Güncel)'}
+                {isGuest
+                  ? 'Misafir Modu: Ayarlar Kilitlidir'
+                  : hasSettingsChanged
+                    ? 'Proje Ayarlarını Kaydet ve Tüm Sisteme Uygula'
+                    : 'Değişiklik Yok (Tüm Ayarlar Güncel)'}
               </span>
             </button>
           </div>
@@ -807,8 +872,19 @@ export const ContractorDashboard: React.FC<ContractorDashboardProps> = ({
             </p>
             <button
               type="button"
-              onClick={() => setIsDeleteModalOpen(true)}
-              className="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/40 font-bold px-4 py-2.5 rounded-xl transition text-xs flex items-center gap-2 cursor-pointer"
+              disabled={isGuest}
+              onClick={() => {
+                if (isGuest || isReadOnly) {
+                  showReadOnlyWarning('Proje silme');
+                  return;
+                }
+                setIsDeleteModalOpen(true);
+              }}
+              className={`font-bold px-4 py-2.5 rounded-xl transition text-xs flex items-center gap-2 ${
+                isGuest
+                  ? 'bg-slate-900 border border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
+                  : 'bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/40 cursor-pointer'
+              }`}
             >
               <Trash2 className="w-4 h-4" />
               Projeyi Kalıcı Olarak Sil

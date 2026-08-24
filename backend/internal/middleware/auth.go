@@ -40,22 +40,21 @@ func GenerateToken(user *models.User) (string, error) {
 	return token.SignedString([]byte(JWTSecret))
 }
 
-func AuthMiddleware(next http.Handler) http.Handler {
+func RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			// Anonymous user defaults to client role with no user ID
-			ctx := context.WithValue(r.Context(), UserContextKey, &models.User{
-				ID:   "",
-				Role: models.RoleClient,
-			})
-			next.ServeHTTP(w, r.WithContext(ctx))
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"Authentication required"}`))
 			return
 		}
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, `{"error":"Invalid authorization header format"}`, http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"Invalid authorization header format"}`))
 			return
 		}
 
@@ -67,7 +66,9 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		})
 
 		if err != nil || !token.Valid {
-			http.Error(w, `{"error":"Invalid or expired token"}`, http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"Invalid or expired token"}`))
 			return
 		}
 
@@ -86,5 +87,6 @@ func GetUserFromContext(ctx context.Context) *models.User {
 	if u, ok := ctx.Value(UserContextKey).(*models.User); ok {
 		return u
 	}
-	return &models.User{Role: models.RoleClient}
+	return nil
 }
+

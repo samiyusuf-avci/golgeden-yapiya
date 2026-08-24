@@ -4,6 +4,7 @@ import { Timer, ChevronDown, Check } from 'lucide-react';
 interface CustomDurationSelectProps {
   value: number;
   onChange: (value: number) => void;
+  disabled?: boolean;
 }
 
 const DURATION_OPTIONS = [
@@ -18,7 +19,7 @@ const DURATION_OPTIONS = [
   { months: 60, label: '60 Ay', sub: '5 Yıl (Master Plan Şehir Projesi)' },
 ];
 
-export const CustomDurationSelect: React.FC<CustomDurationSelectProps> = ({ value, onChange }) => {
+export const CustomDurationSelect: React.FC<CustomDurationSelectProps> = ({ value, onChange, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -41,11 +42,14 @@ export const CustomDurationSelect: React.FC<CustomDurationSelectProps> = ({ valu
     <div className="relative w-full" ref={containerRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full bg-slate-900 border rounded-xl px-3.5 py-2.5 text-sm text-white flex items-center justify-between transition cursor-pointer shadow-inner ${
-          isOpen
-            ? 'border-amber-500 ring-2 ring-amber-500/25 bg-slate-900/90'
-            : 'border-slate-800 hover:border-amber-500/50'
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full bg-slate-900 border rounded-xl px-3.5 py-2.5 text-sm text-white flex items-center justify-between transition shadow-inner ${
+          disabled
+            ? 'opacity-60 cursor-not-allowed border-slate-800'
+            : isOpen
+              ? 'border-amber-500 ring-2 ring-amber-500/25 bg-slate-900/90 cursor-pointer'
+              : 'border-slate-800 hover:border-amber-500/50 cursor-pointer'
         }`}
       >
         <div className="flex items-center gap-2.5 overflow-hidden">

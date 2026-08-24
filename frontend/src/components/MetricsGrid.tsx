@@ -9,7 +9,6 @@ import {
   Percent,
   Building2,
   Clock,
-  Layers,
   CalendarCheck,
   Timer,
   Wallet,
@@ -50,12 +49,27 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ project, isClientHidde
     : 0;
   const isDelayed = kalanSureAy === 0 && project.physical_progress < 100;
 
+  const TR_MONTHS = [
+    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  ];
+
+  const tahminiTeslimatText = (() => {
+    const months = project.estimated_completion_months;
+    if (!months) return '—';
+    const startDate = project.created_at ? new Date(project.created_at) : new Date();
+    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + months, 1);
+    const monthName = TR_MONTHS[endDate.getMonth()];
+    const year = endDate.getFullYear();
+    return `${monthName} ${year} (${months} Ay)`;
+  })();
+
   // -------------------------------------------------------------
-  // CLIENT VIEW
+  // CLIENT VIEW — 3 Kart (Fiziki İlerleme | Tamamlanan Katlar | Tahmini Teslimat)
   // -------------------------------------------------------------
   if (isClientView) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
         {/* 1. Fiziki İlerleme */}
         <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden group hover:border-amber-500/50 transition-all duration-300">
           <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-amber-500/20 transition-all" />
@@ -96,28 +110,7 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ project, isClientHidde
           </span>
         </div>
 
-        {/* 3. İmalat Safhası */}
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden group hover:border-blue-500/50 transition-all duration-300">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-blue-500/20 transition-all" />
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Mevcut İmalat Safhası</span>
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center">
-              <Layers className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-lg font-bold text-white mb-1 truncate">
-            {project.physical_progress >= 70
-              ? 'İnce İşler & Dış Cephe'
-              : project.physical_progress >= 40
-              ? 'Tesisat & Bölme Duvarlar'
-              : 'Kaba İnşaat & Betonarme'}
-          </div>
-          <span className="text-[11px] text-slate-400 block mt-3">
-            Saha ekipleri aktif çalışıyor
-          </span>
-        </div>
-
-        {/* 4. Planlanan Teslimat */}
+        {/* 3. Planlanan Teslimat */}
         <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden group hover:border-purple-500/50 transition-all duration-300">
           <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/20 transition-all" />
           <div className="flex items-center justify-between mb-3">
@@ -126,11 +119,15 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ project, isClientHidde
               <Clock className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-2xl font-extrabold text-white mb-1">
-            Q4 2026
+          <div className="text-xl font-extrabold text-white mb-1 truncate">
+            {tahminiTeslimatText}
           </div>
-          <span className="text-[11px] text-emerald-400 font-medium block mt-3">
-            ✓ İş Takvimine Uygun İlerliyor
+          <span className={`text-[11px] font-medium block mt-3 ${isDelayed ? 'text-rose-400' : 'text-emerald-400'}`}>
+            {isDelayed
+              ? '⚠️ Teslimat Gecikmesinde'
+              : kalanSureAy !== null
+              ? `✓ Kalan Süre: ${kalanSureAy} Ay`
+              : '✓ İş Takvimine Uygun İlerliyor'}
           </span>
         </div>
       </div>
