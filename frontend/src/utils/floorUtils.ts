@@ -1,4 +1,4 @@
-import { getProjectUnitCount, type Project, type BuildingFloor, type Unit } from '../types';
+import { type Project, type BuildingFloor, type Unit } from '../types';
 
 export type FloorTypology =
   | 'residential'

@@ -157,6 +157,35 @@ func (h *APIHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, result)
 }
 
+func (h *APIHandler) ListPublicProjects(w http.ResponseWriter, r *http.Request) {
+	projects, err := h.repo.ListPublicProjects()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch public projects")
+		return
+	}
+
+	if projects == nil {
+		projects = []models.Project{}
+	}
+
+	var result []models.Project
+	for i := range projects {
+		p := &projects[i]
+
+		fullProject, err := h.repo.GetProjectByID(p.ID)
+		if err == nil {
+			p = fullProject
+		}
+
+		h.progressService.CalculateProjectMetrics(p)
+		h.progressService.SanitizeForRole(p, models.RoleContractor)
+		result = append(result, *p)
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+
 func (h *APIHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	userCtx := middleware.GetUserFromContext(r.Context())
 	var req models.CreateProjectRequest

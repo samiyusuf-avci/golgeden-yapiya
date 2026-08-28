@@ -61,6 +61,8 @@ func main() {
 		r.Post("/auth/register", apiHandler.Register)
 		r.Post("/auth/login", apiHandler.Login)
 		r.Post("/projects/{id}/seed", apiHandler.SeedDemoProject)
+		r.Get("/public-projects", apiHandler.ListPublicProjects)
+
 
 		// Protected routes requiring authentication
 		r.Group(func(r chi.Router) {

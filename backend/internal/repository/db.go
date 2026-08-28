@@ -224,6 +224,27 @@ func (r *Repository) ListProjects(userID string) ([]models.Project, error) {
 	return projects, nil
 }
 
+func (r *Repository) ListPublicProjects() ([]models.Project, error) {
+	rows, err := r.db.Query(`SELECT id, contractor_id, name, location, total_budget, visibility, show_financials_to_clients, created_at FROM projects WHERE visibility = 'public' OR visibility IS NULL OR visibility = '' ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []models.Project
+	for rows.Next() {
+		var p models.Project
+		var visStr string
+		if err := rows.Scan(&p.ID, &p.ContractorID, &p.Name, &p.Location, &p.TotalBudget, &visStr, &p.ShowFinancialsToClients, &p.CreatedAt); err != nil {
+			continue
+		}
+		p.Visibility = models.VisibilityType(visStr)
+		projects = append(projects, p)
+	}
+	return projects, nil
+}
+
+
 func (r *Repository) UpdateProjectVisibility(id string, visibility models.VisibilityType, showFinancials bool) error {
 	_, err := r.db.Exec(
 		`UPDATE projects SET visibility = ?, show_financials_to_clients = ? WHERE id = ?`,

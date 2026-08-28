@@ -49,6 +49,7 @@ export function App() {
   });
 
   const [projects, setProjects] = useState<Project[]>([]);
+  const [publicProjects, setPublicProjects] = useState<Project[]>([]);
   const [followedProjects, setFollowedProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(() => {
     return localStorage.getItem('golgeden_active_project_id') || null;
@@ -86,7 +87,7 @@ export function App() {
   }, [isDetailView]);
 
   useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = () => {
       // If we were in detail view, go back to list instead of leaving the site
       setIsDetailView((prev) => {
         if (prev) {
@@ -123,12 +124,15 @@ export function App() {
     localStorage.setItem(key, JSON.stringify(ids));
   };
 
-  const syncFollowedProjects = (currentProjects: Project[], user = currentUser) => {
+  const syncFollowedProjects = (currentProjects: Project[], publicList: Project[] = publicProjects, user = currentUser) => {
     const showcase = ApiService.getShowcaseProjects().map((p) => syncProjectFloorSettings(p));
-    const discoverable = [
-      ...currentProjects,
-      ...showcase.filter((sp) => !currentProjects.some((p) => p.id === sp.id)),
-    ];
+    const discoverable = Array.from(
+      new Map([
+        ...showcase.map((p) => [p.id, p] as const),
+        ...publicList.map((p) => [p.id, p] as const),
+        ...currentProjects.map((p) => [p.id, p] as const),
+      ]).values()
+    );
 
     const storedIds = getStoredFollowedIds(user);
     if (storedIds !== null) {
@@ -150,15 +154,21 @@ export function App() {
   const loadProjects = async (userToUse = currentUser) => {
     setLoading(true);
     try {
-      const list = (await ApiService.getProjects('contractor')).map((p) =>
-        syncProjectFloorSettings(p)
-      );
-      setProjects(list);
-      syncFollowedProjects(list, userToUse);
+      const [list, fetchedPublic] = await Promise.all([
+        ApiService.getProjects('contractor'),
+        ApiService.getPublicProjects('contractor'),
+      ]);
+      const normalizedList = list.map((p) => syncProjectFloorSettings(p));
+      const normalizedPublic = fetchedPublic.map((p) => syncProjectFloorSettings(p));
+
+      setProjects(normalizedList);
+      setPublicProjects(normalizedPublic);
+      syncFollowedProjects(normalizedList, normalizedPublic, userToUse);
 
       const showcase = ApiService.getShowcaseProjects().map((p) => syncProjectFloorSettings(p));
       const allKnownIds = new Set([
-        ...list.map((p) => p.id),
+        ...normalizedList.map((p) => p.id),
+        ...normalizedPublic.map((p) => p.id),
         ...showcase.map((p) => p.id),
       ]);
 
@@ -168,7 +178,7 @@ export function App() {
         if (storedId && allKnownIds.has(storedId)) return storedId;
         if (prev && allKnownIds.has(prev)) return prev;
         // Fall back to first own project, or null
-        return list.length > 0 ? list[0].id : null;
+        return normalizedList.length > 0 ? normalizedList[0].id : null;
       });
     } catch (err: any) {
       if (err.message === 'Unauthorized') {
@@ -211,7 +221,7 @@ export function App() {
     setCurrentUser(guestUser);
     const mockList = ApiService.getShowcaseProjects().map((p) => syncProjectFloorSettings(p));
     setProjects([]); // Projelerim is empty for guest users
-    syncFollowedProjects([], guestUser);
+    syncFollowedProjects([], publicProjects, guestUser);
     if (mockList.length > 0) {
       setActiveProjectId(mockList[0].id);
     }
@@ -233,10 +243,13 @@ export function App() {
   };
 
   const showcaseProjects = ApiService.getShowcaseProjects().map((p) => syncProjectFloorSettings(p));
-  const allDiscoverableProjects = [
-    ...projects,
-    ...showcaseProjects.filter((sp) => !projects.some((p) => p.id === sp.id)),
-  ];
+  const allDiscoverableProjects = Array.from(
+    new Map([
+      ...showcaseProjects.map((p) => [p.id, p] as const),
+      ...publicProjects.map((p) => [p.id, p] as const),
+      ...projects.map((p) => [p.id, p] as const),
+    ]).values()
+  );
 
   const activeProject = currentUser?.isGuest
     ? projects.find((p) => p.id === activeProjectId) ||
@@ -262,6 +275,14 @@ export function App() {
       const next = prev.map((p) => (p.id === updated.id ? updated : p));
       ApiService.saveProjectsToStorage(next);
       return next;
+    });
+    setPublicProjects((prev) => {
+      if (updated.visibility === 'public') {
+        const exists = prev.some((p) => p.id === updated.id);
+        return exists ? prev.map((p) => (p.id === updated.id ? updated : p)) : [updated, ...prev];
+      } else {
+        return prev.filter((p) => p.id !== updated.id);
+      }
     });
     setFollowedProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   };
@@ -696,22 +717,16 @@ export function App() {
     if (preventGuestAction('Yeni proje oluşturma')) return;
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8080/api/v1/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      let newProj: Project;
-
-      if (res.ok) {
-        newProj = await res.json();
-      } else {
-        throw new Error('Backend create failed, fallback to local');
-      }
+      const createdProj = await ApiService.createProject(data);
+      const newProj = syncProjectFloorSettings(createdProj);
       setProjects((prev) => [newProj, ...prev]);
+      if (newProj.visibility === 'public') {
+        setPublicProjects((prev) => [newProj, ...prev.filter((p) => p.id !== newProj.id)]);
+      }
       setActiveProjectId(newProj.id);
       setIsDetailView(true);
       setDetailSubTab('viewer');
+
     } catch (err) {
       console.warn('Backend unavailable, constructing new project locally', err);
       // Create local project with empty floors (user will add floors from building settings)

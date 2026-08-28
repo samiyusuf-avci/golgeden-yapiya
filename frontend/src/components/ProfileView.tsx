@@ -7,7 +7,6 @@ import {
   Phone,
   MapPin,
   Briefcase,
-  Award,
   Bell,
   Edit3,
   TrendingUp,

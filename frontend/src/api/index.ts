@@ -263,6 +263,49 @@ export class ApiService {
     return [];
   }
 
+  static async createProject(
+    data: {
+      name: string;
+      location: string;
+      total_budget: number;
+      visibility: VisibilityType;
+      show_financials_to_clients: boolean;
+      estimated_completion_months: number;
+    },
+    activeRole: UserRole = 'contractor'
+  ): Promise<Project> {
+    const res = await fetch(`${API_BASE}/projects`, {
+      method: 'POST',
+      headers: this.getHeaders(activeRole),
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Proje oluşturulamadı' }));
+      throw new Error(err.error || 'Backend project creation failed');
+    }
+
+    const created = await res.json();
+    return this.normalizeProject(created);
+  }
+
+  static async getPublicProjects(activeRole: UserRole = 'contractor'): Promise<Project[]> {
+    try {
+      const res = await fetch(`${API_BASE}/public-projects`, {
+        headers: this.getHeaders(activeRole),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          return data.map((p) => this.normalizeProject(p));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch public projects from backend:', err);
+    }
+    return [];
+  }
+
   static getShowcaseProjects(): Project[] {
     return this.getAllMockProjects('contractor').map((p) => this.normalizeProject(p));
   }
