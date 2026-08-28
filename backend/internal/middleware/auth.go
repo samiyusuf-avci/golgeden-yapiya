@@ -46,7 +46,7 @@ func RequireAuth(next http.Handler) http.Handler {
 		if authHeader == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error":"Authentication required"}`))
+			w.Write([]byte(`{"error":"Kimlik doğrulaması gerekli"}`))
 			return
 		}
 
@@ -54,7 +54,7 @@ func RequireAuth(next http.Handler) http.Handler {
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error":"Invalid authorization header format"}`))
+			w.Write([]byte(`{"error":"Geçersiz yetkilendirme üstbilgisi biçimi"}`))
 			return
 		}
 
@@ -68,7 +68,7 @@ func RequireAuth(next http.Handler) http.Handler {
 		if err != nil || !token.Valid {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error":"Invalid or expired token"}`))
+			w.Write([]byte(`{"error":"Geçersiz veya süresi dolmuş oturum belirteci"}`))
 			return
 		}
 

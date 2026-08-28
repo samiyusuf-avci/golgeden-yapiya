@@ -40,12 +40,12 @@ func respondError(w http.ResponseWriter, status int, message string) {
 func (h *APIHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req models.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		respondError(w, http.StatusBadRequest, "Geçersiz istek içeriği")
 		return
 	}
 
 	if req.Email == "" || req.Password == "" || req.Name == "" {
-		respondError(w, http.StatusBadRequest, "Email, password, and name are required")
+		respondError(w, http.StatusBadRequest, "E-posta, şifre ve ad soyad alanları zorunludur")
 		return
 	}
 
@@ -62,13 +62,13 @@ func (h *APIHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.repo.CreateUser(user); err != nil {
-		respondError(w, http.StatusConflict, "User with this email already exists")
+		respondError(w, http.StatusConflict, "Bu e-posta adresiyle kayıtlı bir kullanıcı zaten var")
 		return
 	}
 
 	token, err := middleware.GenerateToken(user)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to generate auth token")
+		respondError(w, http.StatusInternalServerError, "Kimlik doğrulama belirteci oluşturulamadı")
 		return
 	}
 
@@ -81,19 +81,19 @@ func (h *APIHandler) Register(w http.ResponseWriter, r *http.Request) {
 func (h *APIHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req models.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		respondError(w, http.StatusBadRequest, "Geçersiz istek içeriği")
 		return
 	}
 
 	user, err := h.repo.GetUserByEmail(req.Email)
 	if err != nil || user.PasswordHash != req.Password {
-		respondError(w, http.StatusUnauthorized, "Invalid email or password")
+		respondError(w, http.StatusUnauthorized, "Geçersiz e-posta veya şifre")
 		return
 	}
 
 	token, err := middleware.GenerateToken(user)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to generate auth token")
+		respondError(w, http.StatusInternalServerError, "Kimlik doğrulama belirteci oluşturulamadı")
 		return
 	}
 
@@ -106,13 +106,13 @@ func (h *APIHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *APIHandler) Me(w http.ResponseWriter, r *http.Request) {
 	userCtx := middleware.GetUserFromContext(r.Context())
 	if userCtx == nil || userCtx.ID == "" {
-		respondError(w, http.StatusUnauthorized, "Not authenticated")
+		respondError(w, http.StatusUnauthorized, "Oturum açılmamış veya yetkisiz erişim")
 		return
 	}
 
 	user, err := h.repo.GetUserByID(userCtx.ID)
 	if err != nil {
-		respondError(w, http.StatusNotFound, "User not found")
+		respondError(w, http.StatusNotFound, "Kullanıcı bulunamadı")
 		return
 	}
 
@@ -123,13 +123,13 @@ func (h *APIHandler) Me(w http.ResponseWriter, r *http.Request) {
 func (h *APIHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 	userCtx := middleware.GetUserFromContext(r.Context())
 	if userCtx == nil || userCtx.ID == "" {
-		respondError(w, http.StatusUnauthorized, "Authentication required")
+		respondError(w, http.StatusUnauthorized, "Kimlik doğrulaması gerekli")
 		return
 	}
 
 	projects, err := h.repo.ListProjects(userCtx.ID)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to fetch projects")
+		respondError(w, http.StatusInternalServerError, "Projeler getirilemedi")
 		return
 	}
 
@@ -160,7 +160,7 @@ func (h *APIHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 func (h *APIHandler) ListPublicProjects(w http.ResponseWriter, r *http.Request) {
 	projects, err := h.repo.ListPublicProjects()
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to fetch public projects")
+		respondError(w, http.StatusInternalServerError, "Açık projeler getirilemedi")
 		return
 	}
 
@@ -190,7 +190,7 @@ func (h *APIHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	userCtx := middleware.GetUserFromContext(r.Context())
 	var req models.CreateProjectRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		respondError(w, http.StatusBadRequest, "Geçersiz istek içeriği")
 		return
 	}
 
@@ -225,7 +225,7 @@ func (h *APIHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.repo.CreateProject(project); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to create project")
+		respondError(w, http.StatusInternalServerError, "Proje oluşturulamadı")
 		return
 	}
 
@@ -348,7 +348,7 @@ func (h *APIHandler) GetProjectByID(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.repo.GetProjectByID(projectID)
 	if err != nil {
-		respondError(w, http.StatusNotFound, "Project not found")
+		respondError(w, http.StatusNotFound, "Proje bulunamadı")
 		return
 	}
 
@@ -367,18 +367,18 @@ func (h *APIHandler) UpdateVisibility(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "id")
 	var req models.UpdateVisibilityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		respondError(w, http.StatusBadRequest, "Geçersiz istek içeriği")
 		return
 	}
 
 	if err := h.repo.UpdateProjectVisibility(projectID, req.Visibility, req.ShowFinancialsToClients); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to update project visibility")
+		respondError(w, http.StatusInternalServerError, "Proje görünürlüğü güncellenemedi")
 		return
 	}
 
 	project, err := h.repo.GetProjectByID(projectID)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to fetch updated project")
+		respondError(w, http.StatusInternalServerError, "Güncellenen proje bilgisi alınamadı")
 		return
 	}
 
@@ -396,13 +396,13 @@ func (h *APIHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 		ShowFinancialsToClients *bool                  `json:"show_financials_to_clients"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		respondError(w, http.StatusBadRequest, "Geçersiz istek içeriği")
 		return
 	}
 
 	project, err := h.repo.GetProjectByID(projectID)
 	if err != nil {
-		respondError(w, http.StatusNotFound, "Project not found")
+		respondError(w, http.StatusNotFound, "Proje bulunamadı")
 		return
 	}
 
@@ -423,7 +423,7 @@ func (h *APIHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.repo.UpdateProject(projectID, project.Name, project.Location, project.TotalBudget, project.Visibility, project.ShowFinancialsToClients); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to update project")
+		respondError(w, http.StatusInternalServerError, "Proje güncellenemedi")
 		return
 	}
 
@@ -434,16 +434,16 @@ func (h *APIHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
 func (h *APIHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "id")
 	if projectID == "" {
-		respondError(w, http.StatusBadRequest, "Missing project ID")
+		respondError(w, http.StatusBadRequest, "Proje kimliği (ID) eksik")
 		return
 	}
 
 	if err := h.repo.DeleteProject(projectID); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to delete project")
+		respondError(w, http.StatusInternalServerError, "Proje silinemedi")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"message": "Project deleted successfully"})
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Proje başarıyla silindi"})
 }
 
 // Stage Handlers
@@ -451,16 +451,16 @@ func (h *APIHandler) UpdateStage(w http.ResponseWriter, r *http.Request) {
 	stageID := chi.URLParam(r, "id")
 	var req models.UpdateStageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		respondError(w, http.StatusBadRequest, "Geçersiz istek içeriği")
 		return
 	}
 
 	if err := h.repo.UpdateStage(stageID, req.IsCompleted, req.ActualCost); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to update stage")
+		respondError(w, http.StatusInternalServerError, "Aşama güncellenemedi")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"message": "Stage updated successfully"})
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Aşama başarıyla güncellendi"})
 }
 
 // Expense Handlers
@@ -468,12 +468,12 @@ func (h *APIHandler) CreateExpense(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "id")
 	var req models.CreateExpenseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		respondError(w, http.StatusBadRequest, "Geçersiz istek içeriği")
 		return
 	}
 
 	if req.Amount <= 0 {
-		respondError(w, http.StatusBadRequest, "Expense amount must be greater than zero")
+		respondError(w, http.StatusBadRequest, "Gider miktarı sıfırdan büyük olmalıdır")
 		return
 	}
 
@@ -489,7 +489,7 @@ func (h *APIHandler) CreateExpense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.repo.CreateExpense(expense); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to record expense")
+		respondError(w, http.StatusInternalServerError, "Gider kaydı oluşturulamadı")
 		return
 	}
 
@@ -502,7 +502,7 @@ func (h *APIHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.repo.GetProjectByID(projectID)
 	if err != nil {
-		respondError(w, http.StatusNotFound, "Project not found")
+		respondError(w, http.StatusNotFound, "Proje bulunamadı")
 		return
 	}
 
@@ -518,7 +518,7 @@ func (h *APIHandler) ListExpenses(w http.ResponseWriter, r *http.Request) {
 
 	expenses, err := h.repo.GetExpensesByProjectID(projectID)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to list expenses")
+		respondError(w, http.StatusInternalServerError, "Giderler listelenemedi")
 		return
 	}
 

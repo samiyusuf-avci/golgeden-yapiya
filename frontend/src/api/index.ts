@@ -2,6 +2,35 @@ import type { Project, Expense, UserRole, VisibilityType, UserProfile } from '..
 
 const API_BASE = 'http://localhost:8080/api/v1';
 
+export function translateErrorMessage(msg: string): string {
+  if (!msg) return 'Bir hata oluştu.';
+  const lower = msg.toLowerCase();
+  if (lower.includes('invalid email or password')) return 'Geçersiz e-posta veya şifre';
+  if (lower.includes('email, password, and name are required')) return 'E-posta, şifre ve ad soyad alanları zorunludur';
+  if (lower.includes('user with this email already exists')) return 'Bu e-posta adresiyle kayıtlı bir kullanıcı zaten var';
+  if (lower.includes('invalid request body')) return 'Geçersiz istek içeriği';
+  if (lower.includes('failed to generate auth token')) return 'Kimlik doğrulama belirteci oluşturulamadı';
+  if (lower.includes('not authenticated') || lower.includes('authentication required')) return 'Kimlik doğrulaması yapılması gerekiyor';
+  if (lower.includes('invalid authorization header format')) return 'Geçersiz yetkilendirme biçimi';
+  if (lower.includes('invalid or expired token')) return 'Geçersiz veya süresi dolmuş oturum belirteci';
+  if (lower.includes('user not found')) return 'Kullanıcı bulunamadı';
+  if (lower.includes('project not found')) return 'Proje bulunamadı';
+  if (lower.includes('failed to fetch projects')) return 'Projeler getirilemedi';
+  if (lower.includes('failed to fetch public projects')) return 'Açık projeler getirilemedi';
+  if (lower.includes('failed to create project') || lower.includes('backend project creation failed')) return 'Proje oluşturulamadı';
+  if (lower.includes('failed to update project visibility') || lower.includes('update visibility failed')) return 'Proje görünürlüğü güncellenemedi';
+  if (lower.includes('failed to fetch updated project')) return 'Güncellenen proje bilgisi alınamadı';
+  if (lower.includes('failed to update project')) return 'Proje güncellenemedi';
+  if (lower.includes('missing project id')) return 'Proje kimliği eksik';
+  if (lower.includes('failed to delete project')) return 'Proje silinemedi';
+  if (lower.includes('failed to update stage')) return 'Aşama güncellenemedi';
+  if (lower.includes('expense amount must be greater than zero')) return 'Gider miktarı sıfırdan büyük olmalıdır';
+  if (lower.includes('failed to record expense') || lower.includes('create expense failed')) return 'Gider kaydı oluşturulamadı';
+  if (lower.includes('failed to list expenses')) return 'Giderler listelenemedi';
+  if (lower.includes('unauthorized')) return 'Yetkisiz erişim';
+  return msg;
+}
+
 export class ApiService {
   private static getToken(): string | null {
     return localStorage.getItem('golgeden_token');
@@ -28,7 +57,7 @@ export class ApiService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Giriş başarısız' }));
-      throw new Error(err.error || 'Geçersiz e-posta veya şifre');
+      throw new Error(translateErrorMessage(err.error || 'Geçersiz e-posta veya şifre'));
     }
 
     const data = await res.json();
@@ -48,7 +77,7 @@ export class ApiService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Kayıt başarısız' }));
-      throw new Error(err.error || 'Kayıt işlemi gerçekleştirilemedi');
+      throw new Error(translateErrorMessage(err.error || 'Kayıt işlemi gerçekleştirilemedi'));
     }
 
     const data = await res.json();
@@ -241,7 +270,7 @@ export class ApiService {
       });
       if (res.status === 401) {
         this.logout();
-        throw new Error('Unauthorized');
+        throw new Error('Yetkisiz erişim');
       }
       if (res.ok) {
         const data = await res.json();
@@ -252,7 +281,7 @@ export class ApiService {
         }
       }
     } catch (err: any) {
-      if (err.message === 'Unauthorized') throw err;
+      if (err.message === 'Yetkisiz erişim' || err.message === 'Unauthorized') throw err;
       console.warn('Backend unavailable, checking local storage', err);
     }
 
@@ -282,7 +311,7 @@ export class ApiService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Proje oluşturulamadı' }));
-      throw new Error(err.error || 'Backend project creation failed');
+      throw new Error(err.error || 'Proje oluşturma başarısız oldu');
     }
 
     const created = await res.json();
@@ -307,7 +336,7 @@ export class ApiService {
   }
 
   static getShowcaseProjects(): Project[] {
-    return this.getAllMockProjects('contractor').map((p) => this.normalizeProject(p));
+    return [];
   }
 
   static async seedDemoProject(activeRole: UserRole = 'contractor'): Promise<Project> {
@@ -316,7 +345,7 @@ export class ApiService {
         method: 'POST',
         headers: this.getHeaders(activeRole),
       });
-      if (!res.ok) throw new Error('Backend seed failed');
+      if (!res.ok) throw new Error('Örnek veri yükleme başarısız oldu');
       return await res.json();
     } catch (err) {
       console.warn('Backend unavailable, using local demo state', err);
@@ -334,14 +363,15 @@ export class ApiService {
       const res = await fetch(`${API_BASE}/projects/${id}`, {
         headers: this.getHeaders(activeRole),
       });
-      if (!res.ok) throw new Error('Fetch project failed');
+      if (!res.ok) throw new Error('Proje detayları alınamadı');
       const data = await res.json();
       return this.normalizeProject(data);
     } catch (err) {
-      console.warn('Backend getProject failed, searching local mock projects', err);
+      console.warn('Backend getProject failed', err);
       const all = this.getAllMockProjects(activeRole);
       const found = all.find((p) => p.id === id);
-      return this.normalizeProject(found || all[0]);
+      if (found) return this.normalizeProject(found);
+      throw err;
     }
   }
 
@@ -367,7 +397,7 @@ export class ApiService {
         headers: this.getHeaders(activeRole),
         body: JSON.stringify({ visibility, show_financials_to_clients: showFinancialsToClients }),
       });
-      if (!res.ok) throw new Error('Update visibility failed');
+      if (!res.ok) throw new Error('Görünürlük ayarı güncellenemedi');
       const data = await res.json();
       updateLocalStored(projectID, visibility, showFinancialsToClients);
       return data;
@@ -488,7 +518,7 @@ export class ApiService {
         headers: this.getHeaders('contractor'),
         body: JSON.stringify(expenseData),
       });
-      if (!res.ok) throw new Error('Create expense failed');
+      if (!res.ok) throw new Error('Gider kaydı oluşturulamadı');
       return await res.json();
     } catch (err) {
       console.warn('Backend expense creation failed', err);
@@ -505,13 +535,8 @@ export class ApiService {
   }
 
   // Multi-project Mock Database
-  static getAllMockProjects(activeRole: UserRole): Project[] {
-    return [
-      this.getLocalMockProject(activeRole),
-      this.getSafirVillalariMockProject(activeRole),
-      this.getKehribarKonaklariMockProject(activeRole),
-      this.getYakutKonutlariMockProject(),
-    ];
+  static getAllMockProjects(_activeRole: UserRole): Project[] {
+    return [];
   }
 
   // 1. Zümrüt Kule Rezidans

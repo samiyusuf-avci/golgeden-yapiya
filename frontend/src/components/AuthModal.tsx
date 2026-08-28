@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Building2, Lock, Mail, User as UserIcon, ArrowRight, AlertCircle, Loader2, Eye } from 'lucide-react';
-import { ApiService } from '../api';
+import { ApiService, translateErrorMessage } from '../api';
 
 interface AuthModalProps {
   onSuccess: (user: any) => void;
@@ -34,7 +34,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, onGuestLogin })
         onSuccess(res.user);
       }
     } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu, lütfen bilgilerinizi kontrol ediniz.');
+      setError(translateErrorMessage(err.message || 'Bir hata oluştu, lütfen bilgilerinizi kontrol ediniz.'));
     } finally {
       setLoading(false);
     }
