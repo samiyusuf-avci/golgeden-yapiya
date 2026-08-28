@@ -37,18 +37,26 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
     return followedProjects.length === 0 ? 'discover' : 'followed';
   });
 
-  const filteredFollowed = followedProjects.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.location.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const matchesSearch = (p: { name: string; location: string; description?: string; contractor_name?: string }) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const locationParts = (p.location || '').split(/[\/,]/).map((s) => s.trim().toLowerCase());
+    return (
+      p.name.toLowerCase().includes(q) ||
+      (p.location || '').toLowerCase().includes(q) ||
+      locationParts.some((part) => part.includes(q)) ||
+      (p.description || '').toLowerCase().includes(q) ||
+      (p.contractor_name || '').toLowerCase().includes(q)
+    );
+  };
+
+  const filteredFollowed = followedProjects.filter(matchesSearch);
 
   const discoverProjects = allProjects.filter(
     (p) =>
       !followedProjects.some((fp) => fp.id === p.id) &&
       (p.visibility === 'public' || !p.visibility) &&
-      (p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.location.toLowerCase().includes(searchQuery.toLowerCase()))
+      matchesSearch(p)
   );
 
   return (
@@ -199,7 +207,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                       <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                         <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Sayısı</div>
                         <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
-                          <Building2 className="w-3.5 h-3.5 text-amber-400" /> {floorsCount} Kat
+                          <Building2 className="w-3.5 h-3.5 text-amber-400" /> {floorsCount > 0 ? `${floorsCount} Kat` : '—'}
                         </div>
                       </div>
 
@@ -215,7 +223,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                       <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                         <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Başı Daire</div>
                         <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
-                          <Layers className="w-3.5 h-3.5 text-sky-400" /> {unitsPerFloor} Daire
+                          <Layers className="w-3.5 h-3.5 text-sky-400" /> {unitsPerFloor > 0 ? `${unitsPerFloor} Daire` : '—'}
                         </div>
                       </div>
 
@@ -336,7 +344,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                     <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                       <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Sayısı</div>
                       <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
-                        <Building2 className="w-3.5 h-3.5 text-amber-400" /> {floorsCount} Kat
+                        <Building2 className="w-3.5 h-3.5 text-amber-400" /> {floorsCount > 0 ? `${floorsCount} Kat` : '—'}
                       </div>
                     </div>
 
@@ -352,7 +360,7 @@ export const FollowingView: React.FC<FollowingViewProps> = ({
                     <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
                       <div className="text-[10px] text-slate-400 font-semibold uppercase">Kat Başı Daire</div>
                       <div className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
-                        <Layers className="w-3.5 h-3.5 text-sky-400" /> {unitsPerFloor} Daire
+                        <Layers className="w-3.5 h-3.5 text-sky-400" /> {unitsPerFloor > 0 ? `${unitsPerFloor} Daire` : '—'}
                       </div>
                     </div>
 

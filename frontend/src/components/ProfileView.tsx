@@ -168,13 +168,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
                     {profile.name}
                   </h2>
-                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5" /> Doğrulanmış Profil
-                  </span>
                 </div>
                 <p className="text-sm font-semibold text-slate-400 flex items-center justify-center md:justify-start gap-2 mt-1">
                   <Briefcase className="w-4 h-4 text-amber-400" />
-                  {profile.title} • <span className="text-slate-300">{profile.company}</span>
+                  {profile.title}{profile.title && profile.company ? ' ' : ''}<span className="text-slate-300">{profile.company}</span>
                 </p>
               </div>
             </div>
@@ -348,19 +345,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                Şirket / Organizasyon
-              </label>
-              <input
-                type="text"
-                disabled={!isEditing}
-                value={profile.company}
-                onChange={(e) => setProfile({ ...profile, company: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 disabled:opacity-75 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 transition"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
                 E-Posta Adresi
               </label>
               <input
@@ -368,6 +352,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 disabled={!isEditing}
                 value={profile.email}
                 onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 disabled:opacity-75 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                Şirket / Organizasyon
+              </label>
+              <input
+                type="text"
+                disabled={!isEditing}
+                value={profile.company}
+                onChange={(e) => setProfile({ ...profile, company: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 disabled:opacity-75 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 transition"
               />
             </div>

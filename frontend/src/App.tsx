@@ -25,6 +25,9 @@ import {
   Eye,
   Shield,
   MapPin,
+  UserCircle,
+  Mail,
+  Phone,
 } from 'lucide-react';
 
 export function App() {
@@ -40,7 +43,7 @@ export function App() {
   const [isDetailView, setIsDetailView] = useState<boolean>(() => {
     return localStorage.getItem('golgeden_is_detail_view') === 'true';
   });
-  const [detailSubTab, setDetailSubTab] = useState<'viewer' | 'finances' | 'settings' | 'sales'>(() => {
+  const [detailSubTab, setDetailSubTab] = useState<'viewer' | 'finances' | 'settings' | 'sales' | 'publisher'>(() => {
     const saved = localStorage.getItem('golgeden_detail_sub_tab');
     return (saved as any) || 'viewer';
   });
@@ -72,6 +75,29 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('golgeden_main_tab', mainTab);
   }, [mainTab]);
+
+  // Browser back button: push a history entry when entering detail view,
+  // and pop back to list view when the user presses the browser back button.
+  useEffect(() => {
+    if (isDetailView) {
+      // Push a new entry so the back button has somewhere to go within the app
+      window.history.pushState({ detailView: true }, '');
+    }
+  }, [isDetailView]);
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      // If we were in detail view, go back to list instead of leaving the site
+      setIsDetailView((prev) => {
+        if (prev) {
+          return false;
+        }
+        return prev;
+      });
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Followed Projects Persistence Utilities
   const getFollowedStorageKey = (user = currentUser) => {
@@ -130,16 +156,20 @@ export function App() {
       setProjects(list);
       syncFollowedProjects(list, userToUse);
 
-      if (list.length > 0) {
-        setActiveProjectId((prev) => {
-          const storedId = localStorage.getItem('golgeden_active_project_id');
-          if (storedId && list.some((p) => p.id === storedId)) return storedId;
-          if (prev && list.some((p) => p.id === prev)) return prev;
-          return list[0].id;
-        });
-      } else {
-        setActiveProjectId(null);
-      }
+      const showcase = ApiService.getShowcaseProjects().map((p) => syncProjectFloorSettings(p));
+      const allKnownIds = new Set([
+        ...list.map((p) => p.id),
+        ...showcase.map((p) => p.id),
+      ]);
+
+      setActiveProjectId((prev) => {
+        const storedId = localStorage.getItem('golgeden_active_project_id');
+        // Prefer stored ID if it's in any known source
+        if (storedId && allKnownIds.has(storedId)) return storedId;
+        if (prev && allKnownIds.has(prev)) return prev;
+        // Fall back to first own project, or null
+        return list.length > 0 ? list[0].id : null;
+      });
     } catch (err: any) {
       if (err.message === 'Unauthorized') {
         setCurrentUser(null);
@@ -244,6 +274,13 @@ export function App() {
     }
   }, [isDetailView, isFinancialsAllowed, detailSubTab]);
 
+  // If detail view is active but the project can't be found (e.g. after refresh), fall back to list
+  useEffect(() => {
+    if (isDetailView && !loading && activeProject === null) {
+      setIsDetailView(false);
+    }
+  }, [isDetailView, loading, activeProject]);
+
   if (!currentUser) {
     return <AuthModal onSuccess={handleAuthSuccess} onGuestLogin={handleGuestLogin} />;
   }
@@ -337,6 +374,18 @@ export function App() {
             <ShoppingBag className="w-3.5 h-3.5" />
             Satış
           </button>
+          {isReadOnly && (
+            <button
+              onClick={() => setDetailSubTab('publisher')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${detailSubTab === 'publisher'
+                  ? 'bg-amber-500 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+                }`}
+            >
+              <UserCircle className="w-3.5 h-3.5" />
+              Yayıncı Profili
+            </button>
+          )}
           {!isReadOnly && (
             <button
               onClick={() => setDetailSubTab('settings')}
@@ -422,6 +471,183 @@ export function App() {
           isGuest={currentUser?.isGuest}
           isReadOnly={isReadOnly}
         />
+      )}
+
+      {activeProject && detailSubTab === 'publisher' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6 pb-5 border-b border-slate-800">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-yellow-500/10 border border-amber-500/30 flex items-center justify-center">
+                <UserCircle className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white tracking-tight">Proje Yayıncısı</h3>
+                <p className="text-xs text-slate-400">Bu şantiyeyi platforma ekleyen ve yöneten kişi</p>
+              </div>
+            </div>
+
+            {/* Publisher Card */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+              {/* Avatar */}
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-500/30 to-yellow-600/10 border-2 border-amber-500/40 flex items-center justify-center flex-shrink-0 shadow-lg">
+                <UserCircle className="w-10 h-10 text-amber-400" />
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 text-center sm:text-left space-y-3">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">
+                    {activeProject.contractor_name ||
+                      (isReadOnly ? 'Proje Yüklenicisi' : userProfile.name || 'Proje Yüklenicisi')}
+                  </h2>
+                  {!isReadOnly && userProfile.title && (
+                    <p className="text-sm text-amber-400 font-semibold mt-0.5">{userProfile.title}</p>
+                  )}
+                </div>
+
+                {/* Tags */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  {(!isReadOnly && userProfile.company) && (
+                    <span className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-xl">
+                      <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                      {userProfile.company}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-xl">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    {activeProject.location}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-8">
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center">
+                <div className="text-2xl font-black text-amber-400">
+                  {isReadOnly
+                    ? allDiscoverableProjects.filter((p) => p.contractor_id === activeProject.contractor_id && (p.visibility === 'public' || !p.visibility)).length
+                    : projects.length}
+                </div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Aktif Proje</div>
+              </div>
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center">
+                <div className="text-2xl font-black text-emerald-400">
+                  {activeProject.physical_progress.toFixed(0)}%
+                </div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Bu Proje İlerleme</div>
+              </div>
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center col-span-2 sm:col-span-1">
+                <div className="text-2xl font-black text-sky-400">
+                  {activeProject.status === 'completed' ? '✓' : activeProject.status === 'active' ? '●' : '○'}
+                </div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                  {activeProject.status === 'completed' ? 'Tamamlandı' : activeProject.status === 'active' ? 'Aktif' : 'Planlama'}
+                </div>
+              </div>
+            </div>
+
+            {/* Contact (only for own profile) */}
+            {!isReadOnly && (userProfile.email || userProfile.phone) && (
+              <div className="mt-6 pt-5 border-t border-slate-800">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">İletişim</p>
+                <div className="flex flex-wrap gap-3">
+                  {userProfile.email && (
+                    <a
+                      href={`mailto:${userProfile.email}`}
+                      className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold px-4 py-2.5 rounded-xl transition"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-amber-400" />
+                      {userProfile.email}
+                    </a>
+                  )}
+                  {userProfile.phone && (
+                    <a
+                      href={`tel:${userProfile.phone}`}
+                      className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold px-4 py-2.5 rounded-xl transition"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-amber-400" />
+                      {userProfile.phone}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Publisher's Projects */}
+            {(() => {
+              const publisherProjects = isReadOnly
+                ? allDiscoverableProjects.filter(
+                    (p) =>
+                      p.contractor_id === activeProject.contractor_id &&
+                      (p.visibility === 'public' || !p.visibility)
+                  )
+                : projects;
+              if (publisherProjects.length === 0) return null;
+              return (
+                <div className="mt-6 pt-5 border-t border-slate-800">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
+                    Yayıncının Projeleri
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {publisherProjects.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          handleSelectProject(p);
+                          setDetailSubTab('viewer');
+                        }}
+                        className={`text-left bg-slate-950/60 hover:bg-slate-800/80 border rounded-2xl p-4 transition group cursor-pointer ${
+                          p.id === activeProject.id
+                            ? 'border-amber-500/50 bg-amber-500/5'
+                            : 'border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-white truncate group-hover:text-amber-300 transition">
+                              {p.name}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-amber-500/60 flex-shrink-0" />
+                              {p.location}
+                            </p>
+                          </div>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-lg flex-shrink-0 ${
+                              p.status === 'completed'
+                                ? 'bg-emerald-500/15 text-emerald-400'
+                                : p.status === 'active'
+                                ? 'bg-amber-500/15 text-amber-400'
+                                : 'bg-slate-700/60 text-slate-400'
+                            }`}
+                          >
+                            {p.status === 'completed'
+                              ? 'Tamamlandı'
+                              : p.status === 'active'
+                              ? 'Aktif'
+                              : 'Planlama'}
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2">
+                          <div
+                            className="bg-amber-500 h-1.5 rounded-full transition-all"
+                            style={{ width: `${p.physical_progress}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1.5 font-semibold">
+                          %{p.physical_progress.toFixed(0)} fiziksel ilerleme
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -804,8 +1030,13 @@ export function App() {
       <Navbar
         activeMainTab={mainTab}
         onSelectMainTab={(tab) => {
+          // If clicking the already-active tab while in detail view → go back to list
+          if (tab === mainTab && isDetailView) {
+            setIsDetailView(false);
+            return;
+          }
           setMainTab(tab);
-          if (tab === 'my-projects') setIsDetailView(false);
+          if (tab === 'my-projects' || tab === 'following') setIsDetailView(false);
         }}
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
         userProfile={userProfile}
