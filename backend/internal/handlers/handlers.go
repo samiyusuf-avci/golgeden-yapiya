@@ -119,6 +119,43 @@ func (h *APIHandler) Me(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, user)
 }
 
+func (h *APIHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	userCtx := middleware.GetUserFromContext(r.Context())
+	if userCtx == nil || userCtx.ID == "" {
+		respondError(w, http.StatusUnauthorized, "Oturum açılmamış veya yetkisiz erişim")
+		return
+	}
+
+	var req models.DeleteAccountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Geçersiz istek içeriği")
+		return
+	}
+
+	if req.Password == "" {
+		respondError(w, http.StatusBadRequest, "Hesabınızı silmek için mevcut şifrenizi girmelisiniz")
+		return
+	}
+
+	user, err := h.repo.GetUserByID(userCtx.ID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "Kullanıcı bulunamadı")
+		return
+	}
+
+	if user.PasswordHash != req.Password {
+		respondError(w, http.StatusUnauthorized, "Girdiğiniz şifre hatalı")
+		return
+	}
+
+	if err := h.repo.DeleteUser(user.ID); err != nil {
+		respondError(w, http.StatusInternalServerError, "Hesap silinirken bir hata oluştu")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Hesabınız başarıyla silindi"})
+}
+
 // Project Handlers
 func (h *APIHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 	userCtx := middleware.GetUserFromContext(r.Context())

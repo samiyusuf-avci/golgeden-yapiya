@@ -15,8 +15,10 @@ import {
   Shield,
   Layers,
   Save,
-  Lock
+  Lock,
+  Trash2
 } from 'lucide-react';
+import { DeleteAccountModal } from './DeleteAccountModal';
 
 interface ProfileViewProps {
   profile: UserProfile;
@@ -27,6 +29,7 @@ interface ProfileViewProps {
   isGuest?: boolean;
   onOpenAuthModal?: () => void;
   onSelectMainTab?: (tab: any) => void;
+  onAccountDeleted?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -38,16 +41,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   isGuest,
   onOpenAuthModal,
   onSelectMainTab,
+  onAccountDeleted,
 }) => {
   const [profile, setProfile] = useState<UserProfile>(initialProfile);
   const [isEditing, setIsEditing] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'info' | 'settings'>('info');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const totalManagedBudget = projects.reduce((sum, p) => sum + (p.total_budget || 0), 0);
   const totalUnits = projects.reduce((sum, p) => sum + getProjectUnitCount(p), 0);
   const totalInspectable = allProjects.length > 0
     ? allProjects.length
-    : Math.max(followedProjects.length, projects.length, 3);
+    : Math.max(followedProjects.length, projects.length);
 
   const handleSave = () => {
     setIsEditing(false);
@@ -100,7 +105,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">İnceleyebileceğiniz Şantiyeler</span>
               <div className="text-xl font-black text-sky-400 mt-1">{totalInspectable} Canlı Proje</div>
-              <p className="text-[10px] text-slate-500 mt-0.5">Platformda incelemeye açık aktif şantiye verileri</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">
+                {totalInspectable > 0
+                  ? 'Platformda incelemeye açık aktif şantiye verileri'
+                  : 'Şu anda platformda incelemeye açık şantiye bulunmuyor'}
+              </p>
             </div>
 
             <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl">
@@ -508,6 +517,52 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Danger Zone: Account Deletion */}
+      {!isGuest && (
+        <div className="bg-gradient-to-r from-red-950/20 via-slate-900/90 to-red-950/20 border border-red-500/25 rounded-3xl p-6 md:p-8 space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 rounded-2xl bg-red-500/10 border border-red-500/25 text-red-400 flex items-center justify-center shrink-0 mt-0.5">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-extrabold text-white">Hesap Silme ve Kalıcı Kapatma</h3>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                    Tehlikeli Bölge
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
+                  Hesabınızı ve platformda tanımlı tüm şantiyelerinizi, kat ve bağımsız bölümlerinizi, harcama verilerinizi kalıcı olarak siler. Bu işlem geri alınamaz.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="px-5 py-2.5 rounded-2xl bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/30 hover:border-red-600 text-xs font-bold transition flex items-center justify-center gap-2 shrink-0 cursor-pointer shadow-lg shadow-red-950/30"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Hesabımı Sil</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Modal */}
+      {!isGuest && (
+        <DeleteAccountModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onSuccess={() => {
+            if (onAccountDeleted) {
+              onAccountDeleted();
+            }
+          }}
+        />
       )}
     </div>
   );

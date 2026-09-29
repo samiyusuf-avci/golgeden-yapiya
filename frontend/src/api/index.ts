@@ -15,6 +15,9 @@ export function translateErrorMessage(msg: string): string {
   if (lower.includes('invalid or expired token')) return 'Geçersiz veya süresi dolmuş oturum belirteci';
   if (lower.includes('user not found')) return 'Kullanıcı bulunamadı';
   if (lower.includes('project not found')) return 'Proje bulunamadı';
+  if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('connection refused')) {
+    return 'Sunucuya bağlanılamadı. Lütfen arka uç (backend) servisinin açık olduğundan emin olun.';
+  }
   if (lower.includes('failed to fetch projects')) return 'Projeler getirilemedi';
   if (lower.includes('failed to fetch public projects')) return 'Açık projeler getirilemedi';
   if (lower.includes('failed to create project') || lower.includes('backend project creation failed')) return 'Proje oluşturulamadı';
@@ -116,6 +119,21 @@ export class ApiService {
     localStorage.removeItem('golgeden_projects');
     localStorage.removeItem('golgeden_active_project_id');
     localStorage.removeItem('golgeden_is_detail_view');
+  }
+
+  static async deleteAccount(password: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/auth/account`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Hesap silinemedi' }));
+      throw new Error(translateErrorMessage(err.error || 'Hesap silinemedi'));
+    }
+
+    this.logout();
   }
 
   static getUserProfile(): UserProfile {

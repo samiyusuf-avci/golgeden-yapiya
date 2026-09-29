@@ -155,6 +155,27 @@ func (r *Repository) GetUserByID(id string) (*models.User, error) {
 	return &u, nil
 }
 
+func (r *Repository) DeleteUser(id string) error {
+	rows, err := r.db.Query(`SELECT id FROM projects WHERE contractor_id = ?`, id)
+	if err == nil {
+		var projectIDs []string
+		for rows.Next() {
+			var pid string
+			if err := rows.Scan(&pid); err == nil {
+				projectIDs = append(projectIDs, pid)
+			}
+		}
+		rows.Close()
+		for _, pid := range projectIDs {
+			_ = r.DeleteProject(pid)
+		}
+	}
+
+	_, _ = r.db.Exec(`DELETE FROM project_collaborators WHERE user_id = ?`, id)
+	_, err = r.db.Exec(`DELETE FROM users WHERE id = ?`, id)
+	return err
+}
+
 // Project Methods
 func (r *Repository) CreateProject(p *models.Project) error {
 	_, err := r.db.Exec(

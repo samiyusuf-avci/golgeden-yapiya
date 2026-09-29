@@ -140,6 +140,10 @@ type AuthResponse struct {
 	User  User   `json:"user"`
 }
 
+type DeleteAccountRequest struct {
+	Password string `json:"password"`
+}
+
 type UpdateVisibilityRequest struct {
 	Visibility              VisibilityType `json:"visibility"`
 	ShowFinancialsToClients bool           `json:"show_financials_to_clients"`

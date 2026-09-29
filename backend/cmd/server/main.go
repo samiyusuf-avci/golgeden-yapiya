@@ -69,6 +69,7 @@ func main() {
 			r.Use(customMiddleware.RequireAuth)
 
 			r.Get("/auth/me", apiHandler.Me)
+			r.Delete("/auth/account", apiHandler.DeleteAccount)
 
 			// Projects
 			r.Get("/projects", apiHandler.ListProjects)

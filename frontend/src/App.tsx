@@ -13,6 +13,7 @@ import { ProfileView } from './components/ProfileView';
 import { FollowingView } from './components/FollowingView';
 import { SalesView } from './components/SalesView';
 import { AuthModal } from './components/AuthModal';
+import { LogoutConfirmModal } from './components/LogoutConfirmModal';
 import { syncProjectFloorSettings } from './utils/floorUtils';
 import {
   Building2,
@@ -57,6 +58,7 @@ export function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [userProfile, setUserProfile] = useState<UserProfile>(ApiService.getUserProfile());
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState<boolean>(false);
 
   // State Persistence Effects
   useEffect(() => {
@@ -240,6 +242,8 @@ export function App() {
     setProjects([]);
     setFollowedProjects([]);
     setActiveProjectId(null);
+    setIsLogoutModalOpen(false);
+    setMainTab('my-projects');
   };
 
   const showcaseProjects = ApiService.getShowcaseProjects().map((p) => syncProjectFloorSettings(p));
@@ -1055,7 +1059,7 @@ export function App() {
         }}
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
         userProfile={userProfile}
-        onLogout={handleLogout}
+        onLogout={() => setIsLogoutModalOpen(true)}
         isGuest={currentUser?.isGuest}
         onOpenAuthModal={() => setCurrentUser(null)}
       />
@@ -1182,6 +1186,7 @@ export function App() {
                 isGuest={currentUser?.isGuest}
                 onOpenAuthModal={() => setCurrentUser(null)}
                 onSelectMainTab={setMainTab}
+                onAccountDeleted={handleLogout}
               />
             )}
           </>
@@ -1198,6 +1203,13 @@ export function App() {
           <span>Şeffaf Proje Takip & Canlı Şantiye Portalı • React TypeScript</span>
         </div>
       </footer>
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={handleLogout}
+      />
     </div>
   );
 }
